@@ -1,0 +1,5 @@
+[project]
+name = "game-log-pipeline"
+version = "0.1.0"
+description = "Synthetic idle-game reward integrity pipeline"
+requires-python = ">=3.11"
