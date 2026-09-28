@@ -69,7 +69,7 @@ flowchart LR
 ## 검증과 한계
 
 - 로컬 Python 3.11에서 단위/통합 검사 23개와 CLI 실행으로 확인합니다. 실제 실행 증거는 [검증 기록](docs/verification.md), 클러스터 실행 결과는 [Kubernetes 배포 문서](docs/kubernetes.md).
-- `schema.sql`은 SQLite 기준 구현용입니다. 웨어하우스용 `marts.sql`은 PostgreSQL과 Snowflake가 함께 받는 SQL로 썼고, PostgreSQL에서만 실행 확인했습니다.
+- `schema.sql`은 SQLite 기준 구현용입니다. 웨어하우스용 `marts.sql`은 PostgreSQL과 Snowflake가 함께 받는 SQL이며, 두 곳 모두에서 실행해 같은 결과를 확인했습니다.
 - 공개 fixture는 합성 source만 받습니다. 실제 개인정보를 넣지 마세요. RAW에는 입력 원문이 남습니다.
 - 재화 획득 사건만 다루며 소비·환불·전체 원장 대사는 후속 범위입니다.
 - 기간·정책·플레이어 속성은 합성 데이터의 전제입니다. 실제 서비스는 신뢰할 수 있는 서버 원장과 대조해야 합니다.
