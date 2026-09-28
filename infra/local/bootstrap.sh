@@ -4,7 +4,7 @@
 # Run from the repo root inside WSL: bash infra/local/bootstrap.sh
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-IMAGE=game-log-pipeline:0.3.0
+IMAGE=game-log-pipeline:0.4.0
 
 # VPNs can lower the WSL MTU (1280 here); keep kind's network at the host MTU instead of 1500.
 host_if=$(ip route show default | awk '{print $5; exit}')

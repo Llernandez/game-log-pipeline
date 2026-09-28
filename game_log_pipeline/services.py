@@ -31,7 +31,7 @@ def create_app():
 
     producer = Producer({**kafka_config(), "enable.idempotence": True, "acks": "all",
                          "linger.ms": 20, "compression.type": "zstd"})
-    app = FastAPI(title="game-log-pipeline ingest", version="0.3.0")
+    app = FastAPI(title="game-log-pipeline ingest", version="0.4.0")
     # Scraped by Prometheus (PodMonitor); counts events, not requests, so batches of any size compare.
     events_total = Counter("glp_ingest_events", "Events handled by the ingest API", ["result"])
     app.mount("/metrics", make_asgi_app())
@@ -78,6 +78,7 @@ def run_loader(batch_size=500):
     from confluent_kafka import Consumer
     from prometheus_client import Counter, Gauge, start_http_server
 
+    from .incremental import keys
     from .warehouse import ensure_landing
 
     # Consumer lag itself comes from the Kafka exporter; these show what the loader committed.
@@ -97,11 +98,13 @@ def run_loader(batch_size=500):
             rows = [raw_record(m.topic(), m.partition(), m.offset(), m.value().decode("utf-8", "replace"),
                                datetime.now(timezone.utc).isoformat())
                     for m in messages if m.error() is None]
+            rows = [row + keys(row[3]) for row in rows]
             if not rows:
                 continue
             with conn.cursor() as cursor:
-                cursor.executemany("""INSERT INTO raw_events(topic, kafka_partition, kafka_offset, payload, ingested_at)
-                                      VALUES (%s, %s, %s, %s, %s)
+                cursor.executemany("""INSERT INTO raw_events(topic, kafka_partition, kafka_offset, payload, ingested_at,
+                                                             event_key, txn_key, keyed)
+                                      VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE)
                                       ON CONFLICT (topic, kafka_partition, kafka_offset) DO NOTHING""", rows)
             conn.commit()
             consumer.commit(asynchronous=False)
@@ -123,7 +126,7 @@ def snowflake_auth(env):
                                              serialization.NoEncryption())}
 
 
-def run_rebuild():
+def run_rebuild(mode="incremental"):
     """One-shot job (Airflow KubernetesPodOperator / CronJob): landing PG -> marts in PG (+Snowflake)."""
     import psycopg
 
@@ -142,7 +145,7 @@ def run_rebuild():
                 **snowflake_auth(os.environ))
             targets.append(snowflake)
         try:
-            result = rebuild_warehouse(source, targets)
+            result = rebuild_warehouse(source, targets, mode)
         finally:
             if snowflake:
                 snowflake.close()

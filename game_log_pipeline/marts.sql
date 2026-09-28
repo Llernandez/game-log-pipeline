@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS clean_events (
  source_raw_id BIGINT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS quarantine (raw_id BIGINT PRIMARY KEY, reason TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS pipeline_state (name TEXT PRIMARY KEY, value BIGINT NOT NULL);
 CREATE OR REPLACE VIEW transactions AS
  SELECT player_id, currency, transaction_id, MIN(event_id) AS event_id,
         MAX(reward_claim_id) AS reward_claim_id, MAX(reason) AS reason, MAX(amount) AS amount,

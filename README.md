@@ -4,6 +4,8 @@
 
 **v0.2.0**은 v0.1.0의 Python + SQLite 기준 규칙을 그대로 두고, **Kubernetes 위에서 FastAPI 수집 API → Kafka(Strimzi) → PostgreSQL(CloudNativePG) → Airflow(KubernetesPodOperator) 재계산**으로 확장했습니다. 배포는 **Helm 차트 + Kustomize 오버레이를 Argo CD(app-of-apps)가 Git에서 동기화**합니다. 로컬 kind 클러스터에서 end-to-end로 확인했습니다. Snowflake 적재는 체험 계정에서 실행해 PostgreSQL과 같은 결과를 확인했고, EKS는 설정까지 준비했습니다. → [Kubernetes 배포 문서](docs/kubernetes.md)
 
+**v0.4.0**은 재계산을 **증분**으로 바꿨습니다. 대상마다 워터마크를 두고, 새 RAW와 같은 이벤트·거래 키에 걸린 행만 다시 계산합니다. 결과는 매 묶음 전체 재계산과 대조 검사합니다.
+
 **v0.3.0**은 운영 관점을 더했습니다. **스키마 진화**(생산자 버전 1~3을 함께 받아 정규화, 계약 위반 격리)와 **모니터링**(Prometheus·Grafana, Kafka 컨슈머 지연·로더 정체·재계산 실패 경보, 대시보드를 Git으로 관리)입니다.
 
 게임 소스나 아트, 실제 사용자 로그를 포함하지 않습니다. 모든 이벤트와 경제 수치는 독립적인 합성 데이터입니다.
@@ -68,7 +70,7 @@ flowchart LR
 
 ## 검증과 한계
 
-- 로컬 Python 3.11에서 단위/통합 검사 23개와 CLI 실행으로 확인합니다. 실제 실행 증거는 [검증 기록](docs/verification.md), 클러스터 실행 결과는 [Kubernetes 배포 문서](docs/kubernetes.md).
+- 로컬 Python 3.11에서 단위/통합 검사 29개와 CLI 실행으로 확인합니다. 실제 실행 증거는 [검증 기록](docs/verification.md), 클러스터 실행 결과는 [Kubernetes 배포 문서](docs/kubernetes.md).
 - `schema.sql`은 SQLite 기준 구현용입니다. 웨어하우스용 `marts.sql`은 PostgreSQL과 Snowflake가 함께 받는 SQL이며, 두 곳 모두에서 실행해 같은 결과를 확인했습니다.
 - 공개 fixture는 합성 source만 받습니다. 실제 개인정보를 넣지 마세요. RAW에는 입력 원문이 남습니다.
 - 재화 획득 사건만 다루며 소비·환불·전체 원장 대사는 후속 범위입니다.
@@ -79,8 +81,8 @@ flowchart LR
 
 완료(v0.2.0): Kafka producer/consumer, Airflow 스케줄 재계산, kind + Helm + Kustomize + Argo CD.
 완료(v0.3.0): 스키마 진화(upcasting), Prometheus·Grafana 모니터링과 경보, Snowflake 적재 실행 확인(PostgreSQL marts와 같은 결과, [절차·결과](docs/snowflake.md)).
+완료(v0.4.0): 증분 재계산(대상별 워터마크, 키 기준 영향 범위, 전체 재계산과 결과 대조 검사).
 
-1. 증분 재계산(워터마크·late window)과 Airflow backfill
 3. 수집 API 인증·요청 제한, 조회 API
 4. EKS 실제 배포(ALB, ESO, IRSA)와 부하 시험
 5. 필요 시 근거 요약 LLM API

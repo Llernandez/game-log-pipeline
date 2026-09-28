@@ -148,7 +148,7 @@ def report(db):
         "anomaly_candidates": rows("SELECT * FROM anomaly_candidates ORDER BY rule, player_id, reward_claim_id"),
         "schema_versions": schema_versions(db),
         "naive_minute_spikes": rows("SELECT * FROM naive_minute_spikes ORDER BY player_id, minute"),
-        "limitations": ["Full rebuild for a small fixture; incremental backfill is not implemented.",
+        "limitations": ["This SQLite reference always rebuilds in full; the warehouse job is incremental (warehouse.py) and is tested against it.",
                        "Client-side claims cannot establish authoritative server balances.",
                        "This SQLite path is the reference; the Kafka/PostgreSQL/Airflow deployment reuses the same rules."]
     }

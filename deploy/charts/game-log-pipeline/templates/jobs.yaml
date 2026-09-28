@@ -16,7 +16,7 @@ spec:
           containers:
             - name: rebuild
               {{- include "glp.image" . | nindent 14 }}
-              args: ["rebuild"]
+              args: ["rebuild", "--mode", "incremental"]
               env:
                 {{- include "glp.postgresEnv" . | nindent 16 }}
                 {{- include "glp.snowflakeEnv" . | nindent 16 }}

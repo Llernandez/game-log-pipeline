@@ -11,7 +11,7 @@ from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperato
 from airflow.sdk import DAG
 from kubernetes.client import models as k8s
 
-IMAGE = os.environ.get("GLP_IMAGE", "ghcr.io/llernandez/game-log-pipeline:0.3.0")
+IMAGE = os.environ.get("GLP_IMAGE", "ghcr.io/llernandez/game-log-pipeline:0.4.0")
 PULL_POLICY = os.environ.get("GLP_IMAGE_PULL_POLICY", "IfNotPresent")
 NAMESPACE = os.environ.get("GLP_NAMESPACE", "glp")
 
@@ -42,7 +42,9 @@ with DAG(
         namespace=NAMESPACE,
         image=IMAGE,
         image_pull_policy=PULL_POLICY,
-        arguments=["rebuild"],
+        # Incremental by default; trigger with conf {"mode": "full"} to reprocess everything after a
+        # rule change (the Airflow equivalent of a backfill for this rebuild-from-RAW design).
+        arguments=["rebuild", "--mode", "{{ (dag_run.conf or {}).get('mode', 'incremental') }}"],
         env_vars=ENV,
         get_logs=True,
         on_finish_action="delete_succeeded_pod",

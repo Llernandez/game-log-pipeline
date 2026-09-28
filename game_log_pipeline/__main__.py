@@ -42,6 +42,8 @@ def main():
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--url", default="http://localhost:8080", help="ingest API base URL for send")
     parser.add_argument("--port", type=int, default=8080)
+    parser.add_argument("--mode", choices=["incremental", "full"], default="incremental",
+                        help="rebuild: recompute only what changed since each target's watermark, or everything")
     args = parser.parse_args()
     if args.command == "replay" and not args.input:
         parser.error("replay requires --input")
@@ -58,7 +60,7 @@ def main():
         run_loader()
     else:
         from .services import run_rebuild
-        run_rebuild()
+        run_rebuild(args.mode)
 
 
 if __name__ == "__main__":

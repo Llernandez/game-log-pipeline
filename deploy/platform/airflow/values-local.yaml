@@ -52,7 +52,7 @@ dags:
 
 env:
   - name: GLP_IMAGE
-    value: game-log-pipeline:0.3.0
+    value: game-log-pipeline:0.4.0
   - name: GLP_IMAGE_PULL_POLICY
     value: Never
   - name: GLP_NAMESPACE

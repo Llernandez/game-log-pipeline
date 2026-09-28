@@ -52,8 +52,8 @@ class WarehouseTest(unittest.TestCase):
         text = " ".join(statements("marts.sql")).upper()
         self.assertNotIn("IF NOT EXISTS TRANSACTIONS", text)
         self.assertIn("CREATE OR REPLACE VIEW ANOMALY_CANDIDATES", text)
-        self.assertEqual(len(statements("marts.sql")), 5)
-        self.assertEqual(len(statements("landing_postgres.sql")), 1)
+        self.assertEqual(len(statements("marts.sql")), 6)
+        self.assertEqual(len(statements("landing_postgres.sql")), 6)
 
 
 if __name__ == "__main__":
