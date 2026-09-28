@@ -4,7 +4,9 @@ kind: Application
 metadata:
   name: strimzi
   namespace: argocd
-  annotations: {argocd.argoproj.io/sync-wave: "-2"}
+  # Server-side diff: the API server normalizes the large Kafka CRD, and a client-side diff
+  # reports it OutOfSync forever (selfHeal then re-applies it every few minutes).
+  annotations: {argocd.argoproj.io/sync-wave: "-2", argocd.argoproj.io/compare-options: ServerSideDiff=true}
 spec:
   project: default
   source:

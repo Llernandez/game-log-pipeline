@@ -65,6 +65,17 @@ bash infra/local/bootstrap.sh
 - PostgreSQL marts의 이상 후보: `offline_policy_exceeded:p_excess`, `duplicate_reward_claim:p_repeat` — v0.1.0 SQLite 기준 구현과 같다.
 - 같은 묶음을 한 번 더 보내면 RAW 20, CLEAN 6, 이상 후보 2 유지(격리는 수신 단위라 3→6).
 - eks 오버레이와 values-eks 렌더링은 서버 dry-run 통과.
+- GitOps 전체 재구성(클러스터 삭제 → `bootstrap.sh`): Argo CD 앱 7개(root, strimzi, cloudnative-pg, kafka, postgres, game-log-pipeline, airflow)가 모두 Synced/Healthy. 데모 트래픽 → loader → PostgreSQL 결과는 위와 같다.
+- Airflow `glp_rebuild` DAG: 예약 실행과 수동 실행 모두 success. KubernetesPodOperator가 `rebuild_marts` 파드를 띄워 재계산한다.
+- 시작 순서: loader가 PostgreSQL보다 먼저 뜨면 연결 거부로 재시작하고 DB가 준비되면 복구된다(재시작 정책에 맡김).
+
+## 로컬 환경 문제와 해결
+
+| 증상 | 원인 | 해결 |
+|---|---|---|
+| Argo CD가 GitHub에서 `context deadline exceeded` | 파드는 호스트의 DNS search 도메인과 `ndots:5`를 물려받는다. 일부 ISP DNS는 존재하지 않는 이름에도 응답하므로 `github.com.<search 도메인>`이 ISP 주소로 "해석"된다. 노드는 `ndots:0`이라 정상이어서 파드에서만 재현된다 | `bootstrap.sh`가 search 줄을 뺀 resolv.conf를 kubelet `resolvConf`로 지정 |
+| VPN 사용 시 WSL MTU 1280 | kind 기본 네트워크는 1500 | kind 네트워크를 호스트 MTU로 생성 |
+| strimzi 앱이 계속 OutOfSync, 몇 분마다 CRD 재적용 | API 서버가 큰 Kafka CRD를 정규화해서 클라이언트 측 diff가 끝나지 않음 | 해당 Application에 `ServerSideDiff=true` |
 
 ## 한계
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- 로컬 GitOps 수정: 파드 DNS가 호스트 search 도메인 때문에 외부 이름을 잘못 해석하던 문제(kubelet `resolvConf`), kind 네트워크 MTU를 호스트에 맞춤, strimzi 앱 `ServerSideDiff`로 CRD OutOfSync 반복 제거.
+- 클러스터 재구성부터 Argo CD 7개 앱 Synced/Healthy, Airflow `glp_rebuild` DAG 성공까지 확인. [docs/kubernetes.md](docs/kubernetes.md).
+
 ## 0.2.0 — 2026-09-28
 
 - FastAPI 수집 API(원문 보존, 요청 크기 제한, idempotent producer), Kafka loader(DB 커밋 후 오프셋 커밋, `(topic, partition, offset)` 고유 키), 재계산 작업(PostgreSQL landing → PostgreSQL/Snowflake marts). v0.1.0 규칙은 변경 없음.

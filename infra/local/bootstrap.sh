@@ -6,10 +6,26 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 IMAGE=game-log-pipeline:0.2.0
 
-kind get clusters | grep -qx glp || kind create cluster --config infra/local/kind-config.yaml
+# VPNs can lower the WSL MTU (1280 here); keep kind's network at the host MTU instead of 1500.
+host_if=$(ip route show default | awk '{print $5; exit}')
+host_mtu=$(cat "/sys/class/net/${host_if}/mtu" 2>/dev/null || echo 1500)
+if ! kind get clusters | grep -qx glp; then
+  docker network inspect kind >/dev/null 2>&1 || \
+    docker network create kind --opt com.docker.network.driver.mtu="${host_mtu}" >/dev/null
+  kind create cluster --config infra/local/kind-config.yaml
+fi
 # WSL can stop the distro when idle; bring the node back with Docker instead of leaving it exited.
 docker update --restart=unless-stopped glp-control-plane >/dev/null
+# Pods inherit the host's DNS search domains with ndots:5. Some ISP resolvers answer every unknown
+# name, so github.com.<isp-suffix> "resolves" and Argo CD can't reach GitHub. Kubelet gets the
+# node's nameservers without search domains.
+docker exec glp-control-plane sh -c '
+  grep "^nameserver" /etc/resolv.conf > /etc/kubelet-resolv.conf
+  grep -q "^resolvConf:" /var/lib/kubelet/config.yaml || {
+    echo "resolvConf: /etc/kubelet-resolv.conf" >> /var/lib/kubelet/config.yaml
+    systemctl restart kubelet; }'
 kubectl wait --for=condition=Ready node --all --timeout=180s
+kubectl -n kube-system rollout restart deployment/coredns >/dev/null
 
 # The local overlay pulls nothing for the app: build and side-load the image (GHCR on EKS).
 docker build -q -t "$IMAGE" . >/dev/null
