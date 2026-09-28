@@ -1,0 +1,48 @@
+{{- if .Values.rebuildCronJob.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: glp-rebuild
+  labels: {{- include "glp.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.rebuildCronJob.schedule | quote }}
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: rebuild
+              {{- include "glp.image" . | nindent 14 }}
+              args: ["rebuild"]
+              env:
+                {{- include "glp.postgresEnv" . | nindent 16 }}
+                {{- include "glp.snowflakeEnv" . | nindent 16 }}
+              {{- include "glp.securityContext" . | nindent 14 }}
+              volumeMounts: [{name: tmp, mountPath: /tmp}]
+          volumes: [{name: tmp, emptyDir: {}}]
+{{- end }}
+{{- if .Values.demoTraffic.enabled }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: glp-demo-traffic
+  labels: {{- include "glp.labels" . | nindent 4 }}
+  annotations:
+    # Helm and Argo CD both treat this as a post-sync hook and recreate it on every sync.
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: send
+          {{- include "glp.image" . | nindent 10 }}
+          args: ["send", "--url", "http://glp-ingest"]
+          {{- include "glp.securityContext" . | nindent 10 }}
+{{- end }}

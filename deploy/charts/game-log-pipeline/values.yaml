@@ -1,0 +1,48 @@
+image:
+  repository: ghcr.io/llernandez/game-log-pipeline
+  tag: "0.2.0"
+  pullPolicy: IfNotPresent
+
+kafka:
+  bootstrap: glp-kafka-bootstrap.kafka.svc:9092
+  topic: game.events.raw
+  consumerGroup: glp-loader
+
+# Credentials are never values: the DSN is read from a Secret (CloudNativePG's generated app secret).
+postgres:
+  secretName: glp-db-app
+  secretKey: uri
+
+# Optional second marts target. Leave secretName empty to write PostgreSQL marts only.
+# The Secret needs keys: account, user, password, warehouse, database (schema optional).
+snowflake:
+  secretName: ""
+
+ingest:
+  replicas: 1
+  service:
+    type: ClusterIP
+    nodePort: null
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {memory: 256Mi}
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+
+loader:
+  replicas: 1
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {memory: 256Mi}
+
+# Fallback scheduler for the rebuild when Airflow is not managing it.
+rebuildCronJob:
+  enabled: false
+  schedule: "*/10 * * * *"
+
+# Posts the synthetic fixture once after each sync, to prove the path end to end.
+demoTraffic:
+  enabled: false

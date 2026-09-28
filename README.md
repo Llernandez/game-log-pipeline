@@ -2,7 +2,9 @@
 
 방치형 게임의 **정상 오프라인 보상**, **로그 전송 중복**, **실제 중복 지급 의심**을 구분하는 데이터 엔지니어링 포트폴리오입니다.
 
-현재 **v0.1.0은 Python + SQLite로 실행하는 로컬 기준 구현**입니다. Kafka·Snowflake·Airflow·FastAPI·Kubernetes는 후속 단계이며 현재 구현했다고 주장하지 않습니다. 게임 소스나 아트, 실제 사용자 로그를 포함하지 않습니다. 모든 이벤트와 경제 수치는 독립적인 합성 데이터입니다.
+**v0.2.0**은 v0.1.0의 Python + SQLite 기준 규칙을 그대로 두고, **Kubernetes 위에서 FastAPI 수집 API → Kafka(Strimzi) → PostgreSQL(CloudNativePG) → Airflow(KubernetesPodOperator) 재계산**으로 확장했습니다. 배포는 **Helm 차트 + Kustomize 오버레이를 Argo CD(app-of-apps)가 Git에서 동기화**합니다. 로컬 kind 클러스터에서 end-to-end로 확인했고, EKS와 Snowflake는 설정·코드까지 준비했습니다. → [Kubernetes 배포 문서](docs/kubernetes.md)
+
+게임 소스나 아트, 실제 사용자 로그를 포함하지 않습니다. 모든 이벤트와 경제 수치는 독립적인 합성 데이터입니다.
 
 ## 문제
 
@@ -61,8 +63,8 @@ flowchart LR
 
 ## 검증과 한계
 
-- 로컬 Python 3.11에서 단위/통합 검사 12개와 CLI 실행으로 확인합니다. 실제 실행 증거는 [검증 기록](docs/verification.md).
-- `schema.sql`은 SQLite용입니다. Snowflake 호환을 검증하지 않았습니다.
+- 로컬 Python 3.11에서 단위/통합 검사 19개와 CLI 실행으로 확인합니다. 실제 실행 증거는 [검증 기록](docs/verification.md), 클러스터 실행 결과는 [Kubernetes 배포 문서](docs/kubernetes.md).
+- `schema.sql`은 SQLite 기준 구현용입니다. 웨어하우스용 `marts.sql`은 PostgreSQL과 Snowflake가 함께 받는 SQL로 썼고, PostgreSQL에서만 실행 확인했습니다.
 - 공개 fixture는 합성 source만 받습니다. 실제 개인정보를 넣지 마세요. RAW에는 입력 원문이 남습니다.
 - 재화 획득 사건만 다루며 소비·환불·전체 원장 대사는 후속 범위입니다.
 - 기간·정책·플레이어 속성은 합성 데이터의 전제입니다. 실제 서비스는 신뢰할 수 있는 서버 원장과 대조해야 합니다.
@@ -70,11 +72,12 @@ flowchart LR
 
 ## 다음 단계
 
-1. Kafka producer/consumer와 재시작·재전송 테스트
-2. Snowflake RAW/CLEAN/MART, 커넥터 버전/전달 보장 명시
-3. Airflow 구간 변환, 지연 도착·backfill·재시도
-4. 조회 API 및 L7 요청 경로·장애 진단
-5. Steam 관측 수집, kind/Ingress/Helm
-6. 필요 시 근거 요약 LLM API
+완료(v0.2.0): Kafka producer/consumer, Airflow 스케줄 재계산, kind + Helm + Kustomize + Argo CD.
+
+1. Snowflake 체험 계정으로 marts 적재 실행 확인
+2. 증분 재계산(워터마크·late window)과 Airflow backfill
+3. 수집 API 인증·요청 제한, 조회 API
+4. EKS 실제 배포(ALB, ESO, IRSA)와 부하 시험
+5. 필요 시 근거 요약 LLM API
 
 [설계 결정](docs/decisions.md) · [변경 이력](CHANGELOG.md)

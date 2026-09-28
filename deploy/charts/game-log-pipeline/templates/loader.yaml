@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: glp-loader
+  labels: {{- include "glp.labels" . | nindent 4 }}
+    app.kubernetes.io/component: loader
+spec:
+  replicas: {{ .Values.loader.replicas }}
+  selector:
+    matchLabels: {app.kubernetes.io/name: game-log-pipeline, app.kubernetes.io/component: loader}
+  template:
+    metadata:
+      labels: {{- include "glp.labels" . | nindent 8 }}
+        app.kubernetes.io/component: loader
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: loader
+          {{- include "glp.image" . | nindent 10 }}
+          args: ["load"]
+          env:
+            {{- include "glp.env" . | nindent 12 }}
+            {{- include "glp.postgresEnv" . | nindent 12 }}
+            - name: GLP_GROUP
+              value: {{ .Values.kafka.consumerGroup | quote }}
+          resources: {{- toYaml .Values.loader.resources | nindent 12 }}
+          {{- include "glp.securityContext" . | nindent 10 }}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+      volumes: [{name: tmp, emptyDir: {}}]

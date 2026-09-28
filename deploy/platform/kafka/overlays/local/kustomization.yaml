@@ -1,0 +1,5 @@
+# kind: one dual-role node on the default local-path StorageClass.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base

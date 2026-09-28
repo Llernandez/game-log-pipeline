@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: glp-ingest
+  labels: {{- include "glp.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ingest
+spec:
+  replicas: {{ .Values.ingest.replicas }}
+  selector:
+    matchLabels: {app.kubernetes.io/name: game-log-pipeline, app.kubernetes.io/component: ingest}
+  template:
+    metadata:
+      labels: {{- include "glp.labels" . | nindent 8 }}
+        app.kubernetes.io/component: ingest
+    spec:
+      containers:
+        - name: api
+          {{- include "glp.image" . | nindent 10 }}
+          args: ["api", "--port", "8080"]
+          env: {{- include "glp.env" . | nindent 12 }}
+          ports: [{name: http, containerPort: 8080}]
+          readinessProbe:
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 20
+          resources: {{- toYaml .Values.ingest.resources | nindent 12 }}
+          {{- include "glp.securityContext" . | nindent 10 }}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+      volumes: [{name: tmp, emptyDir: {}}]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: glp-ingest
+  labels: {{- include "glp.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.ingest.service.type }}
+  selector: {app.kubernetes.io/name: game-log-pipeline, app.kubernetes.io/component: ingest}
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      {{- if .Values.ingest.service.nodePort }}
+      nodePort: {{ .Values.ingest.service.nodePort }}
+      {{- end }}
+{{- if .Values.ingest.autoscaling.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: glp-ingest
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: glp-ingest}
+  minReplicas: {{ .Values.ingest.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.ingest.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: {type: Utilization, averageUtilization: {{ .Values.ingest.autoscaling.targetCPUUtilizationPercentage }}}
+{{- end }}

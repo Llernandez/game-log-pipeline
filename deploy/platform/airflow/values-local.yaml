@@ -1,0 +1,51 @@
+# Official apache-airflow chart 1.22.0 (Airflow 3.2.2) on kind.
+# LocalExecutor: tasks run in the scheduler, and the only task launches a KubernetesPodOperator pod.
+executor: LocalExecutor
+allowPodLaunching: true
+
+# Metadata DB is the CloudNativePG cluster (database "airflow"). The Secret airflow-metadata (key
+# "connection") is derived from the operator-generated glp-db-app by infra/local/bootstrap.sh.
+postgresql:
+  enabled: false
+redis:
+  enabled: false
+data:
+  metadataSecretName: airflow-metadata
+
+# Argo CD renders the chart itself, so Helm hooks become plain resources (chart docs' Argo advice).
+createUserJob:
+  useHelmHooks: false
+  applyCustomEnv: false
+migrateDatabaseJob:
+  useHelmHooks: false
+  applyCustomEnv: false
+
+statsd:
+  enabled: false
+triggerer:
+  enabled: false
+
+apiServer:
+  service:
+    type: NodePort
+    ports:
+      - name: api-server
+        port: 8080
+        nodePort: 30082
+
+dags:
+  gitSync:
+    enabled: true
+    repo: https://github.com/Llernandez/game-log-pipeline.git
+    branch: main
+    rev: HEAD
+    subPath: airflow/dags
+    period: 60s
+
+env:
+  - name: GLP_IMAGE
+    value: game-log-pipeline:0.2.0
+  - name: GLP_IMAGE_PULL_POLICY
+    value: Never
+  - name: GLP_NAMESPACE
+    value: glp

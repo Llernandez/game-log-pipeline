@@ -1,0 +1,17 @@
+# CloudNativePG: landing zone for RAW plus the PostgreSQL marts target, and Airflow metadata.
+# The operator generates credentials in Secret glp-db-app (keys: username, password, uri) -
+# nothing secret lives in this repository.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: glp-db
+spec:
+  instances: 1
+  storage:
+    size: 2Gi
+  bootstrap:
+    initdb:
+      database: glp
+      owner: glp
+      postInitSQL:
+        - CREATE DATABASE airflow OWNER glp

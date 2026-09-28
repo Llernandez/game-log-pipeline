@@ -1,0 +1,13 @@
+# argo/argo-cd 10.9.2 (Argo CD v3.5.3) for the local kind demo. HTTP on NodePort 30081
+# (http://localhost:30081). Dex and notifications are off to keep the single node light.
+configs:
+  params:
+    server.insecure: true
+server:
+  service:
+    type: NodePort
+    nodePortHttp: 30081
+dex:
+  enabled: false
+notifications:
+  enabled: false

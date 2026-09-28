@@ -1,4 +1,4 @@
-name: local-contract-tests
+name: ci
 on: [push, pull_request]
 permissions:
   contents: read
@@ -15,3 +15,32 @@ jobs:
           python-version: ${{ matrix.python }}
       - run: python -m unittest discover -s tests -v
       - run: python -m game_log_pipeline demo --output runs/ci
+
+  manifests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - name: Helm lint and render (local and eks values)
+        run: |
+          chart=deploy/charts/game-log-pipeline
+          for values in values-local.yaml values-eks.yaml; do
+            helm lint "$chart" -f "$chart/$values"
+            helm template glp "$chart" -n glp -f "$chart/$values" > /dev/null
+          done
+      - name: Kustomize build every overlay
+        run: |
+          for overlay in deploy/platform/*/overlays/*; do
+            [ -f "$overlay/kustomization.yaml" ] && kubectl kustomize "$overlay" > /dev/null && echo "ok $overlay"
+          done
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: game-log-pipeline:ci

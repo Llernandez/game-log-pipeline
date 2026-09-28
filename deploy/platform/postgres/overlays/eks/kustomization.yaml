@@ -1,0 +1,11 @@
+# EKS: three instances (one primary, two replicas) on gp3. Rendered, not applied.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+patches:
+  - target: {kind: Cluster, name: glp-db}
+    patch: |-
+      - {op: replace, path: /spec/instances, value: 3}
+      - {op: replace, path: /spec/storage/size, value: 20Gi}
+      - {op: add, path: /spec/storage/storageClass, value: gp3}

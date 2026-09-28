@@ -1,0 +1,18 @@
+# App-of-apps: Argo CD watches deploy/argocd/apps and creates every other Application from Git.
+# Apply once after installing Argo CD (infra/local/bootstrap.sh does this).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: glp-root
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Llernandez/game-log-pipeline.git
+    targetRevision: main
+    path: deploy/argocd/apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}

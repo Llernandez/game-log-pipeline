@@ -1,0 +1,19 @@
+# eksctl config for reference only (not created). Three nodes spread over AZs for RF-3 Kafka and
+# a 3-instance PostgreSQL cluster; EBS CSI and Pod Identity add-ons for gp3 volumes and secrets.
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata:
+  name: glp
+  region: ap-northeast-2
+addons:
+  - name: aws-ebs-csi-driver
+  - name: eks-pod-identity-agent
+  - name: metrics-server
+managedNodeGroups:
+  - name: data
+    instanceType: m6i.large
+    desiredCapacity: 3
+    minSize: 3
+    maxSize: 4
+    volumeSize: 50
+    privateNetworking: true

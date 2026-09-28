@@ -1,0 +1,6 @@
+apiVersion: v2
+name: game-log-pipeline
+description: Ingest API, Kafka loader and rebuild job for the synthetic idle reward pipeline
+type: application
+version: 0.2.0
+appVersion: "0.2.0"

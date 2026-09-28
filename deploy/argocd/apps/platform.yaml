@@ -1,0 +1,36 @@
+# Wave -1: Kafka cluster/topic and PostgreSQL cluster, as Kustomize overlays (local here, eks later).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kafka
+  namespace: argocd
+  annotations: {argocd.argoproj.io/sync-wave: "-1"}
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Llernandez/game-log-pipeline.git
+    targetRevision: main
+    path: deploy/platform/kafka/overlays/local
+  destination: {server: https://kubernetes.default.svc, namespace: kafka}
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions: [CreateNamespace=true]
+    retry: {limit: 10, backoff: {duration: 15s, factor: 2, maxDuration: 3m}}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: postgres
+  namespace: argocd
+  annotations: {argocd.argoproj.io/sync-wave: "-1"}
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Llernandez/game-log-pipeline.git
+    targetRevision: main
+    path: deploy/platform/postgres/overlays/local
+  destination: {server: https://kubernetes.default.svc, namespace: glp}
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions: [CreateNamespace=true]
+    retry: {limit: 10, backoff: {duration: 15s, factor: 2, maxDuration: 3m}}

@@ -1,0 +1,23 @@
+# EKS: three nodes, replication 3 / min ISR 2, gp3 volumes kept on delete. Rendered and reviewed,
+# not applied (no EKS cluster is running for this portfolio; see infra/eks/README.md).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+patches:
+  - target: {kind: KafkaNodePool, name: dual-role}
+    patch: |-
+      - {op: replace, path: /spec/replicas, value: 3}
+      - {op: replace, path: /spec/storage/volumes/0/size, value: 50Gi}
+      - {op: replace, path: /spec/storage/volumes/0/deleteClaim, value: false}
+      - {op: add, path: /spec/storage/volumes/0/class, value: gp3}
+  - target: {kind: Kafka, name: glp}
+    patch: |-
+      - {op: replace, path: /spec/kafka/config/offsets.topic.replication.factor, value: 3}
+      - {op: replace, path: /spec/kafka/config/transaction.state.log.replication.factor, value: 3}
+      - {op: replace, path: /spec/kafka/config/transaction.state.log.min.isr, value: 2}
+      - {op: replace, path: /spec/kafka/config/default.replication.factor, value: 3}
+      - {op: replace, path: /spec/kafka/config/min.insync.replicas, value: 2}
+  - target: {kind: KafkaTopic, name: game-events-raw}
+    patch: |-
+      - {op: replace, path: /spec/replicas, value: 3}

@@ -1,0 +1,11 @@
+# EKS: image from GHCR, autoscaled ingest behind an internal Service (expose with an ALB Ingress
+# via the AWS Load Balancer Controller), Snowflake credentials synced from AWS Secrets Manager by
+# External Secrets Operator into Secret glp-snowflake. Rendered, not applied.
+ingest:
+  replicas: 2
+  autoscaling:
+    enabled: true
+loader:
+  replicas: 3   # one per topic partition
+snowflake:
+  secretName: glp-snowflake

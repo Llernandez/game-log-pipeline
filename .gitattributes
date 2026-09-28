@@ -1,0 +1,3 @@
+# Scripts and manifests run on Linux (WSL, containers, CI): keep LF regardless of core.autocrlf.
+* text=auto eol=lf
+*.sqlite binary

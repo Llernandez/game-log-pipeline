@@ -1,0 +1,10 @@
+# kind: image loaded with `kind load docker-image`, API exposed on the host through NodePort 30080.
+image:
+  repository: game-log-pipeline
+  pullPolicy: Never
+ingest:
+  service:
+    type: NodePort
+    nodePort: 30080
+demoTraffic:
+  enabled: true
