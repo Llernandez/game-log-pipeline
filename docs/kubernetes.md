@@ -102,7 +102,17 @@ bash infra/local/bootstrap.sh
 3. 새 행과 같은 event_id의 모든 전송, 같은 거래 키의 모든 이벤트를 더 늘어나지 않을 때까지 모은다(폐포).
 4. 그 범위만 기존 규칙으로 계산해 해당 이벤트·전송 행을 교체하고 워터마크를 옮긴다(한 트랜잭션).
 
-워터마크가 없는 대상은 전체 재계산으로 시작한다. 규칙을 바꾼 뒤에는 Airflow에서 conf `{"mode": "full"}`로 실행한다.
+워터마크가 없는 대상은 전체 재계산으로 시작한다.
+
+확인(2026-09-29, kind + Snowflake 체험 계정, Airflow `glp_rebuild`):
+
+| 실행 | PostgreSQL | Snowflake |
+|---|---|---|
+| 1. 워터마크 없음 | full, RAW 40(이전 30행 키 채움), clean 6 | full, clean 6 |
+| 2. 같은 fixture 재전송 10건 뒤 | incremental, 새 RAW 10 → 재계산 50(모두 같은 키), clean 6, 격리 15 | 같음 |
+| 3. 새 이벤트 1건 뒤 | incremental, 새 RAW 1 → 재계산 1, clean 7 | 같음 |
+
+재전송은 기존 전송과 키가 같아 폐포가 커지고, 새 이벤트는 그 한 행만 다시 계산한다. 규칙을 바꾼 뒤에는 Airflow에서 conf `{"mode": "full"}`로 실행한다.
 
 ## 한계
 
