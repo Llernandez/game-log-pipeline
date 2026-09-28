@@ -68,6 +68,7 @@ bash infra/local/bootstrap.sh
 - eks 오버레이와 values-eks 렌더링은 서버 dry-run 통과.
 - GitOps 전체 재구성(클러스터 삭제 → `bootstrap.sh`): Argo CD 앱 7개(root, strimzi, cloudnative-pg, kafka, postgres, game-log-pipeline, airflow)가 모두 Synced/Healthy. 데모 트래픽 → loader → PostgreSQL 결과는 위와 같다.
 - Airflow `glp_rebuild` DAG: 예약 실행과 수동 실행 모두 success. KubernetesPodOperator가 `rebuild_marts` 파드를 띄워 재계산한다.
+- 0.3.0 모니터링(2026-09-29, kind): Argo CD 앱 9개(monitoring, monitoring-config 추가) 모두 Synced/Healthy. Prometheus 대상 `glp-ingest`·`glp-loader`·`glp-kafka-exporter` 모두 up. 데모 묶음 전송 뒤 `glp_ingest_events_total{result="accepted"}`와 `glp_loader_rows_total`이 같은 값(20)으로 증가, `kafka_consumergroup_lag` 파티션 0~2 모두 0. 경보 5개 로드(inactive), 대시보드 ConfigMap 적용. Airflow OutOfSync 해소.
 - 시작 순서: loader가 PostgreSQL보다 먼저 뜨면 연결 거부로 재시작하고 DB가 준비되면 복구된다(재시작 정책에 맡김).
 
 ## 로컬 환경 문제와 해결
