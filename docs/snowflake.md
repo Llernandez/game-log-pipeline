@@ -37,3 +37,19 @@ SELECT * FROM GLP.MARTS.ANOMALY_CANDIDATES;     -- offline_policy_exceeded, dupl
 ```
 
 PostgreSQL marts와 같은 값이면 두 대상이 같은 SQL을 받는다는 것이 확인된다. 결과 화면을 캡처해 두면 면접 자료로 쓸 수 있다.
+
+## 실행 결과 (2026-09-29, 체험 계정, AWS)
+
+- 키 페어로 `GLP_SERVICE` 접속: 역할 `GLP_LOADER`, 창고 `GLP_WH`, `GLP.MARTS` 확인.
+- Secret 생성 후 Airflow `glp_rebuild` 수동 실행 → `rebuild_marts` success.
+- 같은 RAW(kind 클러스터에 누적된 데모 전송 3회분)에서 두 대상의 결과가 같다.
+
+| 항목 | PostgreSQL | Snowflake |
+|---|---:|---:|
+| clean_events | 6 | 6 |
+| quarantine | 9 | 9 |
+| duplicate_reward_claim:p_repeat | 2 | 2 |
+| offline_policy_exceeded:p_excess | 1 | 1 |
+
+격리 9건은 같은 fixture를 세 번 보낸 결과(회당 3건)다. 업무 집계와 이상 후보는 재전송에도 변하지 않는다.
+

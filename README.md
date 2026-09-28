@@ -2,7 +2,7 @@
 
 방치형 게임의 **정상 오프라인 보상**, **로그 전송 중복**, **실제 중복 지급 의심**을 구분하는 데이터 엔지니어링 포트폴리오입니다.
 
-**v0.2.0**은 v0.1.0의 Python + SQLite 기준 규칙을 그대로 두고, **Kubernetes 위에서 FastAPI 수집 API → Kafka(Strimzi) → PostgreSQL(CloudNativePG) → Airflow(KubernetesPodOperator) 재계산**으로 확장했습니다. 배포는 **Helm 차트 + Kustomize 오버레이를 Argo CD(app-of-apps)가 Git에서 동기화**합니다. 로컬 kind 클러스터에서 end-to-end로 확인했고, EKS와 Snowflake는 설정·코드까지 준비했습니다. → [Kubernetes 배포 문서](docs/kubernetes.md)
+**v0.2.0**은 v0.1.0의 Python + SQLite 기준 규칙을 그대로 두고, **Kubernetes 위에서 FastAPI 수집 API → Kafka(Strimzi) → PostgreSQL(CloudNativePG) → Airflow(KubernetesPodOperator) 재계산**으로 확장했습니다. 배포는 **Helm 차트 + Kustomize 오버레이를 Argo CD(app-of-apps)가 Git에서 동기화**합니다. 로컬 kind 클러스터에서 end-to-end로 확인했습니다. Snowflake 적재는 체험 계정에서 실행해 PostgreSQL과 같은 결과를 확인했고, EKS는 설정까지 준비했습니다. → [Kubernetes 배포 문서](docs/kubernetes.md)
 
 **v0.3.0**은 운영 관점을 더했습니다. **스키마 진화**(생산자 버전 1~3을 함께 받아 정규화, 계약 위반 격리)와 **모니터링**(Prometheus·Grafana, Kafka 컨슈머 지연·로더 정체·재계산 실패 경보, 대시보드를 Git으로 관리)입니다.
 
@@ -78,10 +78,9 @@ flowchart LR
 ## 다음 단계
 
 완료(v0.2.0): Kafka producer/consumer, Airflow 스케줄 재계산, kind + Helm + Kustomize + Argo CD.
-완료(v0.3.0): 스키마 진화(upcasting), Prometheus·Grafana 모니터링과 경보.
+완료(v0.3.0): 스키마 진화(upcasting), Prometheus·Grafana 모니터링과 경보, Snowflake 적재 실행 확인(PostgreSQL marts와 같은 결과, [절차·결과](docs/snowflake.md)).
 
-1. Snowflake 체험 계정으로 marts 적재 실행 확인 — 키 페어 인증·설정 SQL·Secret 스크립트 준비 완료, 계정 가입 후 실행: [Snowflake 실행 절차](docs/snowflake.md)
-2. 증분 재계산(워터마크·late window)과 Airflow backfill
+1. 증분 재계산(워터마크·late window)과 Airflow backfill
 3. 수집 API 인증·요청 제한, 조회 API
 4. EKS 실제 배포(ALB, ESO, IRSA)와 부하 시험
 5. 필요 시 근거 요약 LLM API
