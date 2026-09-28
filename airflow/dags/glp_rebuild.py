@@ -24,7 +24,7 @@ def secret_env(name, secret, key, optional=False):
 # Snowflake is an optional second target: absent Secret -> variables unset -> PostgreSQL marts only.
 ENV = [secret_env("GLP_POSTGRES_DSN", "glp-db-app", "uri")] + [
     secret_env("GLP_SNOWFLAKE_" + key.upper(), "glp-snowflake", key, optional=True)
-    for key in ("account", "user", "password", "warehouse", "database", "schema")]
+    for key in ("account", "user", "private_key", "password", "warehouse", "database", "schema")]
 
 with DAG(
     dag_id="glp_rebuild",

@@ -80,7 +80,7 @@ flowchart LR
 완료(v0.2.0): Kafka producer/consumer, Airflow 스케줄 재계산, kind + Helm + Kustomize + Argo CD.
 완료(v0.3.0): 스키마 진화(upcasting), Prometheus·Grafana 모니터링과 경보.
 
-1. Snowflake 체험 계정으로 marts 적재 실행 확인
+1. Snowflake 체험 계정으로 marts 적재 실행 확인 — 키 페어 인증·설정 SQL·Secret 스크립트 준비 완료, 계정 가입 후 실행: [Snowflake 실행 절차](docs/snowflake.md)
 2. 증분 재계산(워터마크·late window)과 Airflow backfill
 3. 수집 API 인증·요청 제한, 조회 API
 4. EKS 실제 배포(ALB, ESO, IRSA)와 부하 시험

@@ -37,12 +37,21 @@ securityContext:
 
 {{- define "glp.snowflakeEnv" -}}
 {{- if .Values.snowflake.secretName }}
-{{- range $key := list "account" "user" "password" "warehouse" "database" }}
+{{- range $key := list "account" "user" "warehouse" "database" }}
 - name: GLP_SNOWFLAKE_{{ upper $key }}
   valueFrom:
     secretKeyRef:
       name: {{ $.Values.snowflake.secretName }}
       key: {{ $key }}
+{{- end }}
+{{- /* Either a PEM private key (key-pair auth) or a password. */}}
+{{- range $key := list "private_key" "password" }}
+- name: GLP_SNOWFLAKE_{{ upper $key }}
+  valueFrom:
+    secretKeyRef:
+      name: {{ $.Values.snowflake.secretName }}
+      key: {{ $key }}
+      optional: true
 {{- end }}
 - name: GLP_SNOWFLAKE_SCHEMA
   valueFrom:

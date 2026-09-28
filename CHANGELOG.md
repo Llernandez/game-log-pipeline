@@ -6,6 +6,7 @@
 - 모니터링: kube-prometheus-stack(Prometheus·Alertmanager·Grafana)을 Argo CD 앱으로 추가. 수집 API `/metrics`(`glp_ingest_events_total{result}`), 로더 지표(`glp_loader_rows_total`, `glp_loader_last_commit_unixtime`), Strimzi Kafka Exporter의 컨슈머 지연(`kafka_consumergroup_lag`). 경보 5개(지연 과다, 로더 정체, 로더 없음, 미확인 전송, 재계산 파드 실패)와 Grafana 대시보드를 Git에서 관리.
 - Airflow 차트의 `create-user`/`migrate` Job을 Argo CD Sync 훅으로 실행. 차트 TTL이 완료 Job을 지우면서 앱이 OutOfSync로 보이던 문제 해결.
 - 이미지·차트 0.3.0. kind 설정에 Grafana NodePort 30083.
+- Snowflake 키 페어 인증(PEM `private_key`, 없으면 password). 체험 계정용 `infra/snowflake/setup.sql`(전용 역할·XSMALL 자동정지 창고·서비스 사용자·월 1크레딧 리소스 모니터)과 Secret 생성 스크립트, [실행 절차](docs/snowflake.md).
 
 ## Unreleased (0.2.x 운영 수정)
 

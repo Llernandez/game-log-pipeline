@@ -111,6 +111,18 @@ def run_loader(batch_size=500):
     consumer.close()
 
 
+def snowflake_auth(env):
+    """Key-pair auth (Snowflake's recommendation for service users) when a PEM key is given, else password."""
+    pem = env.get("GLP_SNOWFLAKE_PRIVATE_KEY")
+    if not pem:
+        return {"password": env["GLP_SNOWFLAKE_PASSWORD"]}
+    from cryptography.hazmat.primitives import serialization
+
+    key = serialization.load_pem_private_key(pem.encode("ascii"), password=None)
+    return {"private_key": key.private_bytes(serialization.Encoding.DER, serialization.PrivateFormat.PKCS8,
+                                             serialization.NoEncryption())}
+
+
 def run_rebuild():
     """One-shot job (Airflow KubernetesPodOperator / CronJob): landing PG -> marts in PG (+Snowflake)."""
     import psycopg
@@ -125,9 +137,9 @@ def run_rebuild():
             import snowflake.connector
             snowflake = snowflake.connector.connect(
                 account=os.environ["GLP_SNOWFLAKE_ACCOUNT"], user=os.environ["GLP_SNOWFLAKE_USER"],
-                password=os.environ["GLP_SNOWFLAKE_PASSWORD"], warehouse=os.environ["GLP_SNOWFLAKE_WAREHOUSE"],
-                database=os.environ["GLP_SNOWFLAKE_DATABASE"], schema=os.environ.get("GLP_SNOWFLAKE_SCHEMA", "PUBLIC"),
-                autocommit=False)
+                warehouse=os.environ["GLP_SNOWFLAKE_WAREHOUSE"], database=os.environ["GLP_SNOWFLAKE_DATABASE"],
+                schema=os.environ.get("GLP_SNOWFLAKE_SCHEMA", "PUBLIC"), autocommit=False,
+                **snowflake_auth(os.environ))
             targets.append(snowflake)
         try:
             result = rebuild_warehouse(source, targets)
