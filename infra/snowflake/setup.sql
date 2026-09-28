@@ -22,6 +22,9 @@ CREATE USER IF NOT EXISTS GLP_SERVICE
   DEFAULT_NAMESPACE = GLP.MARTS
   RSA_PUBLIC_KEY = '<paste public key body here>';
 GRANT ROLE GLP_LOADER TO USER GLP_SERVICE;
+-- Put the role under SYSADMIN (Snowflake's recommended hierarchy). Without this, even ACCOUNTADMIN
+-- cannot read the tables and views the service user creates.
+GRANT ROLE GLP_LOADER TO ROLE SYSADMIN;
 
 -- Guardrail for a trial: stop the warehouse after 1 credit a month.
 CREATE RESOURCE MONITOR IF NOT EXISTS GLP_MONITOR WITH CREDIT_QUOTA = 1
