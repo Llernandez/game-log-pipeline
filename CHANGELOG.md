@@ -1,6 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 — 2026-09-29
+
+- 스키마 진화: 생산자가 점진적으로 업그레이드되는 상황을 합성 이벤트로 재현. `schema_version` 1~3을 모두 받아 v1 업무 형태로 정규화(upcasting)한다. v2는 `client_version`(필수, 계보용), v3는 `currency`→`currency_code` 이름 변경. 지원하지 않는 버전·계약 위반은 사유와 함께 격리. 업그레이드된 클라이언트가 같은 이벤트를 새 버전으로 다시 보내면 충돌이 아니라 재전송으로 처리. 보고서에 수신 버전 분포(`schema_versions`). 검사 19개 → 23개.
+- 모니터링: kube-prometheus-stack(Prometheus·Alertmanager·Grafana)을 Argo CD 앱으로 추가. 수집 API `/metrics`(`glp_ingest_events_total{result}`), 로더 지표(`glp_loader_rows_total`, `glp_loader_last_commit_unixtime`), Strimzi Kafka Exporter의 컨슈머 지연(`kafka_consumergroup_lag`). 경보 5개(지연 과다, 로더 정체, 로더 없음, 미확인 전송, 재계산 파드 실패)와 Grafana 대시보드를 Git에서 관리.
+- Airflow 차트의 `create-user`/`migrate` Job을 Argo CD Sync 훅으로 실행. 차트 TTL이 완료 Job을 지우면서 앱이 OutOfSync로 보이던 문제 해결.
+- 이미지·차트 0.3.0. kind 설정에 Grafana NodePort 30083.
+
+## Unreleased (0.2.x 운영 수정)
 
 - 로컬 GitOps 수정: 파드 DNS가 호스트 search 도메인 때문에 외부 이름을 잘못 해석하던 문제(kubelet `resolvConf`), kind 네트워크 MTU를 호스트에 맞춤, strimzi 앱 `ServerSideDiff`로 CRD OutOfSync 반복 제거.
 - 클러스터 재구성부터 Argo CD 7개 앱 Synced/Healthy, Airflow `glp_rebuild` DAG 성공까지 확인. [docs/kubernetes.md](docs/kubernetes.md).

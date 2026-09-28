@@ -27,9 +27,14 @@ def create_app():
     from fastapi import FastAPI, HTTPException, Request
 
     # Idempotent producer: broker-side dedupe of producer retries, acks from all in-sync replicas.
+    from prometheus_client import Counter, make_asgi_app
+
     producer = Producer({**kafka_config(), "enable.idempotence": True, "acks": "all",
                          "linger.ms": 20, "compression.type": "zstd"})
-    app = FastAPI(title="game-log-pipeline ingest", version="0.2.0")
+    app = FastAPI(title="game-log-pipeline ingest", version="0.3.0")
+    # Scraped by Prometheus (PodMonitor); counts events, not requests, so batches of any size compare.
+    events_total = Counter("glp_ingest_events", "Events handled by the ingest API", ["result"])
+    app.mount("/metrics", make_asgi_app())
 
     @app.get("/healthz")
     def healthz():
@@ -48,6 +53,7 @@ def create_app():
         try:
             lines = split_batch(await request.body())
         except BatchRejected as error:
+            events_total.labels("rejected_batch").inc()
             raise HTTPException(status_code=400, detail=str(error))
         failures = []
         for line in lines:
@@ -56,7 +62,9 @@ def create_app():
         remaining = producer.flush(10)
         if remaining or failures:
             # The client retries the whole batch; duplicates are absorbed later by event_id rules.
+            events_total.labels("unacknowledged").inc(len(lines))
             raise HTTPException(status_code=503, detail="not all events acknowledged")
+        events_total.labels("accepted").inc(len(lines))
         return {"accepted": len(lines), "topic": TOPIC}
 
     return app
@@ -64,10 +72,18 @@ def create_app():
 
 def run_loader(batch_size=500):
     """Consume RAW from Kafka into PostgreSQL. Offsets are committed only after the DB commit."""
+    import time
+
     import psycopg
     from confluent_kafka import Consumer
+    from prometheus_client import Counter, Gauge, start_http_server
 
     from .warehouse import ensure_landing
+
+    # Consumer lag itself comes from the Kafka exporter; these show what the loader committed.
+    rows_total = Counter("glp_loader_rows", "RAW rows committed to PostgreSQL")
+    last_commit = Gauge("glp_loader_last_commit_unixtime", "Time of the last DB commit followed by an offset commit")
+    start_http_server(int(os.environ.get("GLP_METRICS_PORT", "9100")))
 
     consumer = Consumer({**kafka_config(), "group.id": os.environ.get("GLP_GROUP", "glp-loader"),
                          "enable.auto.commit": False, "auto.offset.reset": "earliest"})
@@ -89,6 +105,8 @@ def run_loader(batch_size=500):
                                       ON CONFLICT (topic, kafka_partition, kafka_offset) DO NOTHING""", rows)
             conn.commit()
             consumer.commit(asynchronous=False)
+            rows_total.inc(len(rows))
+            last_commit.set(time.time())
             print(json.dumps({"loaded": len(rows)}), flush=True)
     consumer.close()
 

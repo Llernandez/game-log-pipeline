@@ -23,6 +23,9 @@ spec:
             {{- include "glp.postgresEnv" . | nindent 12 }}
             - name: GLP_GROUP
               value: {{ .Values.kafka.consumerGroup | quote }}
+            - name: GLP_METRICS_PORT
+              value: "9100"
+          ports: [{name: metrics, containerPort: 9100}]
           resources: {{- toYaml .Values.loader.resources | nindent 12 }}
           {{- include "glp.securityContext" . | nindent 10 }}
           volumeMounts: [{name: tmp, mountPath: /tmp}]

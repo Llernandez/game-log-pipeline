@@ -1,0 +1,29 @@
+# kube-prometheus-stack on kind: Prometheus, Alertmanager, Grafana, kube-state-metrics.
+# Scrape every PodMonitor/PrometheusRule in the cluster, not only ones labelled for this release.
+prometheus:
+  prometheusSpec:
+    podMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    retention: 2d
+    resources:
+      requests: {cpu: 100m, memory: 400Mi}
+      limits: {memory: 1Gi}
+grafana:
+  service:
+    type: NodePort
+    nodePort: 30083
+  # Dashboards come from ConfigMaps labelled grafana_dashboard=1 in any namespace.
+  sidecar:
+    dashboards:
+      enabled: true
+      searchNamespace: ALL
+alertmanager:
+  alertmanagerSpec:
+    resources:
+      requests: {cpu: 20m, memory: 64Mi}
+# kind runs these control-plane parts without scrapeable endpoints; scraping them only adds TargetDown noise.
+kubeEtcd: {enabled: false}
+kubeControllerManager: {enabled: false}
+kubeScheduler: {enabled: false}
+kubeProxy: {enabled: false}

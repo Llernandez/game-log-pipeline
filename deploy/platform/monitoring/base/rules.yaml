@@ -1,0 +1,42 @@
+# Alerts for the ingest -> Kafka -> loader -> rebuild path. Thresholds are demo values.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: glp-pipeline
+  namespace: glp
+spec:
+  groups:
+    - name: glp-pipeline
+      rules:
+        - alert: GLPConsumerLagHigh
+          expr: sum(kafka_consumergroup_lag{consumergroup="glp-loader"}) > 100
+          for: 5m
+          labels: {severity: warning}
+          annotations:
+            summary: "glp-loader is {{ $value }} messages behind game.events.raw"
+        - alert: GLPLoaderStalled
+          # Messages are waiting, but the loader has not committed for 10 minutes.
+          expr: |
+            (time() - max(glp_loader_last_commit_unixtime)) > 600
+            and sum(kafka_consumergroup_lag{consumergroup="glp-loader"}) > 0
+          for: 5m
+          labels: {severity: critical}
+          annotations:
+            summary: "glp-loader has not committed for over 10 minutes while lag > 0"
+        - alert: GLPLoaderDown
+          expr: absent(up{namespace="glp", pod=~"glp-loader-.*"} == 1)
+          for: 5m
+          labels: {severity: critical}
+          annotations:
+            summary: "No healthy glp-loader target"
+        - alert: GLPIngestUnacknowledged
+          expr: increase(glp_ingest_events_total{result="unacknowledged"}[10m]) > 0
+          labels: {severity: warning}
+          annotations:
+            summary: "Kafka did not acknowledge {{ $value }} events in 10 minutes (clients retry)"
+        - alert: GLPRebuildFailed
+          # Airflow's KubernetesPodOperator pod (name glp-rebuild-*) ended in Failed.
+          expr: max(kube_pod_status_phase{namespace="glp", pod=~"glp-rebuild.*", phase="Failed"}) > 0
+          labels: {severity: warning}
+          annotations:
+            summary: "A rebuild pod failed; check the glp_rebuild DAG run"

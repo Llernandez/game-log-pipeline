@@ -37,6 +37,10 @@ spec:
       min.insync.replicas: 1
   entityOperator:
     topicOperator: {}
+  # Consumer-group lag per partition (kafka_consumergroup_lag), scraped by Prometheus.
+  kafkaExporter:
+    topicRegex: "game\\..*"
+    groupRegex: "glp-.*"
 ---
 apiVersion: kafka.strimzi.io/v1
 kind: KafkaTopic

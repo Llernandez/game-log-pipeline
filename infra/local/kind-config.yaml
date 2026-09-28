@@ -1,7 +1,7 @@
 # Single-node local cluster. NodePorts are mapped to the WSL host, and WSL forwards localhost, so the
 # Windows browser reaches the services at http://localhost:<port>. (ingress-nginx was retired in
 # March 2026, so no ingress controller is used for this local demo.)
-#   30080 ingest API   30081 Argo CD   30082 Airflow
+#   30080 ingest API   30081 Argo CD   30082 Airflow   30083 Grafana
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 name: glp
@@ -11,3 +11,4 @@ nodes:
       - {containerPort: 30080, hostPort: 30080, protocol: TCP}
       - {containerPort: 30081, hostPort: 30081, protocol: TCP}
       - {containerPort: 30082, hostPort: 30082, protocol: TCP}
+      - {containerPort: 30083, hostPort: 30083, protocol: TCP}

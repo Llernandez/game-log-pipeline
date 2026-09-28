@@ -5,7 +5,7 @@ import unittest
 from copy import deepcopy
 from pathlib import Path
 from game_log_pipeline.generator import events
-from game_log_pipeline.pipeline import canonical, connect, ingest, rebuild, report, validate
+from game_log_pipeline.pipeline import canonical, connect, ingest, rebuild, report, upcast, validate
 
 class PipelineTests(unittest.TestCase):
     def setUp(self):
@@ -98,3 +98,51 @@ class PipelineTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class SchemaEvolutionTests(unittest.TestCase):
+    """Producers upgrade gradually: v1-v3 arrive together and normalize to one business shape."""
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.db = connect(Path(self.tmp.name) / "evolution.sqlite")
+    def tearDown(self):
+        self.db.close()
+        self.tmp.cleanup()
+    def base(self, event="ev_v", transaction="tx_v"):
+        item = deepcopy(next(x for x in events() if x["event_id"] == "ev_normal"))
+        item.update(event_id=event, transaction_id=transaction, reward_claim_id="claim_" + event)
+        return item
+    def v2(self, item, client="1.4.0"):
+        return dict(item, schema_version=2, client_version=client)
+    def v3(self, item):
+        upgraded = self.v2(item, "2.0.0")
+        upgraded["schema_version"] = 3
+        upgraded["currency_code"] = upgraded.pop("currency")
+        return upgraded
+    def load(self, items):
+        ingest(self.db, [canonical(x) for x in items])
+        rebuild(self.db)
+        return report(self.db)
+    def test_all_supported_versions_become_clean_events(self):
+        result = self.load([self.base("ev_1", "tx_1"), self.v2(self.base("ev_2", "tx_2")), self.v3(self.base("ev_3", "tx_3"))])
+        self.assertEqual(result["counts"]["clean_events"], 3)
+        self.assertEqual(result["counts"]["quarantine"], 0)
+        self.assertEqual(result["schema_versions"], {"1": 1, "2": 1, "3": 1})
+    def test_same_event_from_an_upgraded_client_is_a_retry_not_a_conflict(self):
+        item = self.base()
+        result = self.load([item, self.v3(item)])
+        self.assertEqual(result["counts"]["clean_events"], 1)
+        self.assertEqual(result["counts"]["quarantine"], 0)
+    def test_contract_breaks_are_quarantined(self):
+        missing_client = dict(self.base("ev_a", "tx_a"), schema_version=2)
+        old_field_in_v3 = dict(self.v2(self.base("ev_b", "tx_b")), schema_version=3)
+        future = dict(self.base("ev_c", "tx_c"), schema_version=4)
+        result = self.load([missing_client, old_field_in_v3, future])
+        self.assertEqual(result["counts"]["clean_events"], 0)
+        reasons = [row[0] for row in self.db.execute("SELECT reason FROM quarantine ORDER BY raw_id")]
+        self.assertEqual(reasons, ["invalid_schema: client_version required from schema 2",
+                                   "invalid_schema: schema 3 uses currency_code",
+                                   "invalid_schema: unsupported schema_version"])
+    def test_upcast_keeps_v1_untouched(self):
+        item = self.base()
+        self.assertEqual(upcast(item), item)
+

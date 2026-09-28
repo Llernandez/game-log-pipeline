@@ -13,12 +13,20 @@ data:
   metadataSecretName: airflow-metadata
 
 # Argo CD renders the chart itself, so Helm hooks become plain resources (chart docs' Argo advice).
+# The chart's TTL deletes finished Jobs, which Argo CD then reported as OutOfSync; running them as
+# Argo CD Sync hooks keeps them out of the sync comparison.
 createUserJob:
   useHelmHooks: false
   applyCustomEnv: false
+  jobAnnotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 migrateDatabaseJob:
   useHelmHooks: false
   applyCustomEnv: false
+  jobAnnotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 
 statsd:
   enabled: false
@@ -44,7 +52,7 @@ dags:
 
 env:
   - name: GLP_IMAGE
-    value: game-log-pipeline:0.2.0
+    value: game-log-pipeline:0.3.0
   - name: GLP_IMAGE_PULL_POLICY
     value: Never
   - name: GLP_NAMESPACE

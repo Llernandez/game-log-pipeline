@@ -58,6 +58,7 @@ bash infra/local/bootstrap.sh
 | http://localhost:30080/readyz | 수집 API(Kafka 연결 확인) |
 | http://localhost:30081 | Argo CD |
 | http://localhost:30082 | Airflow |
+| http://localhost:30083 | Grafana(대시보드 `game-log-pipeline`). 0.3.0 이전에 만든 클러스터는 포트 매핑이 없으므로 `kubectl -n monitoring port-forward svc/kps-grafana 3000:80` |
 
 ## 확인한 결과(2026-09-28, kind)
 
@@ -75,7 +76,23 @@ bash infra/local/bootstrap.sh
 |---|---|---|
 | Argo CD가 GitHub에서 `context deadline exceeded` | 파드는 호스트의 DNS search 도메인과 `ndots:5`를 물려받는다. 일부 ISP DNS는 존재하지 않는 이름에도 응답하므로 `github.com.<search 도메인>`이 ISP 주소로 "해석"된다. 노드는 `ndots:0`이라 정상이어서 파드에서만 재현된다 | `bootstrap.sh`가 search 줄을 뺀 resolv.conf를 kubelet `resolvConf`로 지정 |
 | VPN 사용 시 WSL MTU 1280 | kind 기본 네트워크는 1500 | kind 네트워크를 호스트 MTU로 생성 |
+| airflow 앱이 OutOfSync(`Job/airflow-create-user`) | 차트가 완료 Job을 TTL로 지우면 Argo CD는 리소스가 사라졌다고 본다 | 두 Job을 Argo CD Sync 훅으로 실행(`jobAnnotations`) |
 | strimzi 앱이 계속 OutOfSync, 몇 분마다 CRD 재적용 | API 서버가 큰 Kafka CRD를 정규화해서 클라이언트 측 diff가 끝나지 않음 | 해당 Application에 `ServerSideDiff=true` |
+
+## 모니터링 (0.3.0)
+
+| 신호 | 출처 | 쓰임 |
+|---|---|---|
+| `glp_ingest_events_total{result}` | 수집 API `/metrics` | 수신·거부·미확인(Kafka ack 실패) 이벤트 수 |
+| `glp_loader_rows_total`, `glp_loader_last_commit_unixtime` | 로더 `:9100/metrics` | DB 커밋 후 오프셋 커밋까지 끝난 행 수와 마지막 시각 |
+| `kafka_consumergroup_lag` | Strimzi Kafka Exporter | `glp-loader` 그룹의 파티션별 지연 |
+| `kube_pod_status_phase` | kube-state-metrics | Airflow가 띄운 `glp-rebuild` 파드 실패 |
+
+경보(`deploy/platform/monitoring/base/rules.yaml`): 지연 100건 초과 5분, 지연이 있는데 10분간 커밋 없음(로더 정체), 로더 대상 없음, Kafka 미확인 전송, 재계산 파드 실패. 임계치는 데모 값이다. 스크레이프 대상(PodMonitor)·경보·대시보드가 모두 Git에 있고 Argo CD가 동기화한다.
+
+## 스키마 진화 (0.3.0)
+
+생산자(게임 클라이언트)는 한꺼번에 업그레이드되지 않으므로 여러 스키마 버전이 동시에 들어온다. 재계산은 각 버전을 v1 업무 형태로 정규화한 뒤 같은 규칙을 적용한다. 지원하지 않는 버전과 계약 위반은 사유를 남겨 격리하고, 같은 이벤트가 다른 버전으로 재전송되면 충돌로 보지 않는다. 버전 분포는 보고서의 `schema_versions`로 확인한다.
 
 ## 한계
 

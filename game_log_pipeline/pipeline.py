@@ -20,11 +20,37 @@ def timestamp(value):
         raise ValueError("timezone required")
     return parsed.astimezone(timezone.utc)
 
+SCHEMA_VERSIONS = (1, 2, 3)
+SEMVER = re.compile(r"\d{1,4}\.\d{1,4}\.\d{1,4}")
+
+def upcast(item):
+    """Normalize every supported producer schema to the v1 business shape before validation.
+
+    v2 adds client_version (lineage only, dropped here); v3 renames currency to currency_code.
+    Older clients keep sending older versions, so all supported versions stay accepted and
+    the same event resent by an upgraded client is not a content conflict.
+    """
+    if not isinstance(item, dict):
+        raise ValueError("event must be an object")
+    version = item.get("schema_version")
+    if type(version) is not int or version not in SCHEMA_VERSIONS:
+        raise ValueError("unsupported schema_version")
+    item = dict(item)
+    if version >= 2:
+        client = item.pop("client_version", None)
+        if not isinstance(client, str) or not SEMVER.fullmatch(client):
+            raise ValueError("client_version required from schema 2")
+    if version >= 3:
+        if "currency" in item or "currency_code" not in item:
+            raise ValueError("schema 3 uses currency_code")
+        item["currency"] = item.pop("currency_code")
+    item["schema_version"] = 1
+    return item
+
 def validate(item):
-    if not isinstance(item, dict) or set(item) != FIELDS:
+    item = upcast(item)
+    if set(item) != FIELDS:
         raise ValueError("fields must match the public allowlist")
-    if type(item["schema_version"]) is not int or item["schema_version"] != 1:
-        raise ValueError("unsupported schema")
     if item["source"] != "synthetic" or item["event_type"] != "currency_transaction":
         raise ValueError("only synthetic currency events supported")
     for key in ("event_id", "player_id", "session_id", "transaction_id", "reward_claim_id"):
@@ -100,6 +126,17 @@ def rebuild(db):
                     "currency", "reason", "amount", "event_time", "period_start", "period_end",
                     "policy_version", "expected_max")) + (raw_id,))
 
+def schema_versions(db):
+    """Raw deliveries per declared producer schema, so a rollout's version mix is visible."""
+    counts = defaultdict(int)
+    for (payload,) in db.execute("SELECT payload FROM raw_events"):
+        try:
+            version = json.loads(payload).get("schema_version")
+        except (ValueError, AttributeError):
+            version = None
+        counts[str(version) if type(version) is int else "unreadable"] += 1
+    return dict(sorted(counts.items()))
+
 def report(db):
     def rows(query):
         return [dict(row) for row in db.execute(query)]
@@ -109,8 +146,9 @@ def report(db):
                    for table in ("raw_events", "clean_events", "quarantine", "transactions")},
         "daily_currency": rows("SELECT * FROM daily_currency ORDER BY event_date, player_id"),
         "anomaly_candidates": rows("SELECT * FROM anomaly_candidates ORDER BY rule, player_id, reward_claim_id"),
+        "schema_versions": schema_versions(db),
         "naive_minute_spikes": rows("SELECT * FROM naive_minute_spikes ORDER BY player_id, minute"),
         "limitations": ["Full rebuild for a small fixture; incremental backfill is not implemented.",
                        "Client-side claims cannot establish authoritative server balances.",
-                       "Kafka, Snowflake, Airflow and network deployment are not implemented yet."]
+                       "This SQLite path is the reference; the Kafka/PostgreSQL/Airflow deployment reuses the same rules."]
     }

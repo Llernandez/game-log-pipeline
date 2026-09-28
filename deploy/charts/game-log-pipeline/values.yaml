@@ -1,6 +1,6 @@
 image:
   repository: ghcr.io/llernandez/game-log-pipeline
-  tag: "0.2.0"
+  tag: "0.3.0"
   pullPolicy: IfNotPresent
 
 kafka:

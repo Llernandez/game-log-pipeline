@@ -43,3 +43,21 @@ spec:
     automated: {prune: true, selfHeal: true}
     syncOptions: [CreateNamespace=true]
     retry: {limit: 10, backoff: {duration: 15s, factor: 2, maxDuration: 3m}}
+---
+# Wave 2: scrape targets, alert rules and the dashboard, once the workloads exist.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring-config
+  namespace: argocd
+  annotations: {argocd.argoproj.io/sync-wave: "2"}
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Llernandez/game-log-pipeline.git
+    targetRevision: main
+    path: deploy/platform/monitoring/overlays/local
+  destination: {server: https://kubernetes.default.svc}
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    retry: {limit: 10, backoff: {duration: 15s, factor: 2, maxDuration: 3m}}
