@@ -28,6 +28,8 @@ def keys(payload):
         valid = validate(item)
     except (ValueError, TypeError, OverflowError, AttributeError):
         return event, None
+    if valid["event_type"] == "stage_attempt":
+        return event, None  # attempts only conflict per event_id
     return event, "|".join((valid["player_id"], valid["currency"], valid["transaction_id"]))
 
 

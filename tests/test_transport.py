@@ -38,13 +38,13 @@ class WarehouseTest(unittest.TestCase):
             "SELECT %s FROM clean_events ORDER BY event_id" % ", ".join(CLEAN_COLUMNS))]
         expected_quarantine = [tuple(r) for r in reference.execute("SELECT raw_id, reason FROM quarantine ORDER BY raw_id")]
         raw = [(index + 1, line, "2030-01-02T00:00:00+00:00") for index, line in enumerate(lines)]
-        clean, quarantine = rebuild_rows(raw)
+        clean, quarantine, _ = rebuild_rows(raw)
         self.assertEqual((clean, quarantine), (expected_clean, expected_quarantine))
         self.assertEqual((len(clean), len(quarantine)), (6, 3))
 
     def test_warehouse_raw_ids_are_preserved(self):
         raw = [(1000 + index, canonical(item), "t") for index, item in enumerate(events(7))]
-        clean, quarantine = rebuild_rows(raw)
+        clean, quarantine, _ = rebuild_rows(raw)
         self.assertTrue(all(row[-1] >= 1000 for row in clean))
         self.assertTrue(all(raw_id >= 1000 for raw_id, _ in quarantine))
 
@@ -52,7 +52,7 @@ class WarehouseTest(unittest.TestCase):
         text = " ".join(statements("marts.sql")).upper()
         self.assertNotIn("IF NOT EXISTS TRANSACTIONS", text)
         self.assertIn("CREATE OR REPLACE VIEW ANOMALY_CANDIDATES", text)
-        self.assertEqual(len(statements("marts.sql")), 6)
+        self.assertEqual(len(statements("marts.sql")), 9)
         self.assertEqual(len(statements("landing_postgres.sql")), 6)
 
 

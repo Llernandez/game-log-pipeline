@@ -7,6 +7,10 @@ CREATE TABLE IF NOT EXISTS clean_events (
  period_end TEXT NOT NULL, policy_version TEXT NOT NULL, expected_max BIGINT,
  source_raw_id BIGINT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS clean_attempts (
+ event_id TEXT PRIMARY KEY, player_id TEXT NOT NULL, track TEXT NOT NULL, stage BIGINT NOT NULL,
+ outcome TEXT NOT NULL, duration_ms BIGINT NOT NULL, event_time TEXT NOT NULL, source_raw_id BIGINT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS quarantine (raw_id BIGINT PRIMARY KEY, reason TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS pipeline_state (name TEXT PRIMARY KEY, value BIGINT NOT NULL);
 CREATE OR REPLACE VIEW transactions AS
@@ -26,4 +30,17 @@ CREATE OR REPLACE VIEW anomaly_candidates AS
  UNION ALL
  SELECT 'duplicate_reward_claim' AS rule, player_id, currency, reward_claim_id,
         COUNT(*) AS transaction_count, SUM(amount) AS amount
- FROM transactions GROUP BY player_id, currency, reward_claim_id HAVING COUNT(*) > 1
+ FROM transactions GROUP BY player_id, currency, reward_claim_id HAVING COUNT(*) > 1;
+-- 0.5.0 progression marts. A wall is a stage where several players keep failing and none of those
+-- players has cleared it yet: the signal a balance change is needed, not a verdict on the players.
+CREATE OR REPLACE VIEW stage_funnel AS
+ SELECT track, stage, COUNT(DISTINCT player_id) AS players,
+        COUNT(DISTINCT CASE WHEN outcome = 'clear' THEN player_id END) AS players_cleared,
+        COUNT(*) AS attempts, SUM(CASE WHEN outcome = 'clear' THEN 1 ELSE 0 END) AS clears
+ FROM clean_attempts GROUP BY track, stage;
+CREATE OR REPLACE VIEW difficulty_walls AS
+ SELECT track, stage, COUNT(*) AS stuck_players, SUM(fails) AS fails
+ FROM (SELECT track, stage, player_id, COUNT(*) AS fails FROM clean_attempts
+       GROUP BY track, stage, player_id
+       HAVING SUM(CASE WHEN outcome = 'clear' THEN 1 ELSE 0 END) = 0 AND COUNT(*) >= 3) stuck
+ GROUP BY track, stage HAVING COUNT(*) >= 2

@@ -11,7 +11,7 @@ from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperato
 from airflow.sdk import DAG
 from kubernetes.client import models as k8s
 
-IMAGE = os.environ.get("GLP_IMAGE", "ghcr.io/llernandez/game-log-pipeline:0.4.0")
+IMAGE = os.environ.get("GLP_IMAGE", "ghcr.io/llernandez/game-log-pipeline:0.5.0")
 PULL_POLICY = os.environ.get("GLP_IMAGE_PULL_POLICY", "IfNotPresent")
 NAMESPACE = os.environ.get("GLP_NAMESPACE", "glp")
 

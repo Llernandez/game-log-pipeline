@@ -31,7 +31,7 @@ def create_app():
 
     producer = Producer({**kafka_config(), "enable.idempotence": True, "acks": "all",
                          "linger.ms": 20, "compression.type": "zstd"})
-    app = FastAPI(title="game-log-pipeline ingest", version="0.4.0")
+    app = FastAPI(title="game-log-pipeline ingest", version="0.5.0")
     # Scraped by Prometheus (PodMonitor); counts events, not requests, so batches of any size compare.
     events_total = Counter("glp_ingest_events", "Events handled by the ingest API", ["result"])
     app.mount("/metrics", make_asgi_app())

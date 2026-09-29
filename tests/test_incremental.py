@@ -3,7 +3,7 @@ import random
 import unittest
 from copy import deepcopy
 
-from game_log_pipeline.generator import events
+from game_log_pipeline.generator import attempts, events
 from game_log_pipeline.incremental import closure, keys
 from game_log_pipeline.pipeline import canonical
 from game_log_pipeline.warehouse import delta, rebuild_rows
@@ -33,7 +33,7 @@ def fixture_lines():
     late = deepcopy(next(item for item in base if item["event_id"] == "ev_late"))
     late.update(event_id="ev_late2", transaction_id="tx_late2", reward_claim_id="claim_late2")
     extra.append(late)
-    return [canonical(item) for item in base + extra] + ["{not json", '{"event_id": 5}']
+    return [canonical(item) for item in base + extra + attempts(42)] + ["{not json", '{"event_id": 5}']
 
 
 class IncrementalRebuildTests(unittest.TestCase):
@@ -61,21 +61,24 @@ class IncrementalRebuildTests(unittest.TestCase):
             random.Random(seed + 2000).shuffle(order)
             raw = [(index + 1, line, "t") + keys(line) for index, line in enumerate(order)]
             lookup = lambda events, txns: [r for r in raw[:upto] if r[3] in events or r[4] in txns]
-            clean, quarantine, watermark = {}, {}, 0
+            clean, quarantine, tries, watermark = {}, {}, {}, 0
             cuts = sorted(random.Random(seed + 3000).sample(range(1, len(raw)), 5)) + [len(raw)]
             for upto in cuts:
                 change = delta(raw[watermark:upto], lookup)
                 for event_id in change["events"]:
                     clean.pop(event_id, None)
+                    tries.pop(event_id, None)
                 for raw_id in change["raw_ids"]:
                     quarantine.pop(raw_id, None)
                 clean.update({row[0]: row for row in change["clean"]})
+                tries.update({row[0]: row for row in change["attempts"]})
                 quarantine.update(dict(change["quarantine"]))
                 watermark = upto
-                full_clean, full_quarantine = rebuild_rows([row[:3] for row in raw[:upto]])
+                full_clean, full_quarantine, full_attempts = rebuild_rows([row[:3] for row in raw[:upto]])
                 with self.subTest(seed=seed, upto=upto):
                     self.assertEqual(sorted(clean.values()), sorted(full_clean))
                     self.assertEqual(sorted(quarantine.items()), sorted(full_quarantine))
+                    self.assertEqual(sorted(tries.values()), sorted(full_attempts))
 
     def test_one_new_row_recomputes_only_its_keys(self):
         lines = fixture_lines()

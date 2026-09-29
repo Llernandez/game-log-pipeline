@@ -18,6 +18,7 @@ WATERMARK = "raw_watermark"
 CLEAN_COLUMNS = ("event_id", "player_id", "transaction_id", "reward_claim_id", "currency", "reason",
                  "amount", "event_time", "period_start", "period_end", "policy_version",
                  "expected_max", "source_raw_id")
+ATTEMPT_COLUMNS = ("event_id", "player_id", "track", "stage", "outcome", "duration_ms", "event_time", "source_raw_id")
 
 
 def statements(name: str) -> list[str]:
@@ -27,7 +28,7 @@ def statements(name: str) -> list[str]:
 
 
 def rebuild_rows(raw_rows):
-    """[(raw_id, payload, ingested_at)] -> (clean_rows, quarantine_rows) using the reference rules."""
+    """[(raw_id, payload, ingested_at)] -> (clean_rows, quarantine_rows, attempt_rows) by the reference rules."""
     db = connect(":memory:")
     try:
         with db:
@@ -36,7 +37,9 @@ def rebuild_rows(raw_rows):
         clean = [tuple(row) for row in db.execute(
             "SELECT %s FROM clean_events ORDER BY event_id" % ", ".join(CLEAN_COLUMNS))]
         quarantine = [tuple(row) for row in db.execute("SELECT raw_id, reason FROM quarantine ORDER BY raw_id")]
-        return clean, quarantine
+        attempts = [tuple(row) for row in db.execute(
+            "SELECT %s FROM clean_attempts ORDER BY event_id" % ", ".join(ATTEMPT_COLUMNS))]
+        return clean, quarantine, attempts
     finally:
         db.close()
 
@@ -98,9 +101,9 @@ def raw_by_keys(conn, events, txns):
 def delta(new_rows, lookup):
     """Recompute the key closure of new keyed RAW rows with the reference rules."""
     rows, events = closure(new_rows, lookup)
-    clean, quarantine = rebuild_rows([row[:3] for row in rows])
+    clean, quarantine, attempts = rebuild_rows([row[:3] for row in rows])
     return {"events": sorted(events), "raw_ids": [row[0] for row in rows], "clean": clean,
-            "quarantine": quarantine, "new_raw": len(new_rows)}
+            "quarantine": quarantine, "attempts": attempts, "new_raw": len(new_rows)}
 
 
 def read_watermark(conn):
@@ -123,12 +126,15 @@ def ensure_marts(conn):
     conn.commit()
 
 
-def insert_rows(cursor, clean, quarantine):
+def insert_rows(cursor, clean, quarantine, attempts):
     if quarantine:
         cursor.executemany("INSERT INTO quarantine(raw_id, reason) VALUES (%s, %s)", quarantine)
     if clean:
         cursor.executemany("INSERT INTO clean_events(%s) VALUES (%s)" % (
             ", ".join(CLEAN_COLUMNS), ", ".join(["%s"] * len(CLEAN_COLUMNS))), clean)
+    if attempts:
+        cursor.executemany("INSERT INTO clean_attempts(%s) VALUES (%s)" % (
+            ", ".join(ATTEMPT_COLUMNS), ", ".join(["%s"] * len(ATTEMPT_COLUMNS))), attempts)
 
 
 def write_delta(conn, change, watermark):
@@ -137,9 +143,10 @@ def write_delta(conn, change, watermark):
     try:
         if change["events"]:
             cursor.executemany("DELETE FROM clean_events WHERE event_id = %s", [(e,) for e in change["events"]])
+            cursor.executemany("DELETE FROM clean_attempts WHERE event_id = %s", [(e,) for e in change["events"]])
         if change["raw_ids"]:
             cursor.executemany("DELETE FROM quarantine WHERE raw_id = %s", [(r,) for r in change["raw_ids"]])
-        insert_rows(cursor, change["clean"], change["quarantine"])
+        insert_rows(cursor, change["clean"], change["quarantine"], change["attempts"])
         set_watermark(cursor, watermark)
         conn.commit()
     except Exception:
@@ -147,14 +154,15 @@ def write_delta(conn, change, watermark):
         raise
 
 
-def write_marts(conn, clean, quarantine, watermark=None):
+def write_marts(conn, clean, quarantine, attempts, watermark=None):
     """Full replace. conn: DB-API connection with %s paramstyle and autocommit off."""
     ensure_marts(conn)
     cursor = conn.cursor()
     try:
         cursor.execute("DELETE FROM clean_events")
         cursor.execute("DELETE FROM quarantine")
-        insert_rows(cursor, clean, quarantine)
+        cursor.execute("DELETE FROM clean_attempts")
+        insert_rows(cursor, clean, quarantine, attempts)
         if watermark is not None:
             set_watermark(cursor, watermark)
         conn.commit()
@@ -175,14 +183,14 @@ def rebuild_warehouse(source, targets, mode="incremental"):
         if mode == "full" or watermark is None:
             if full is None:
                 full = rebuild_rows([row for row in read_raw(source) if row[0] <= latest])
-            write_marts(target, full[0], full[1], latest)
-            runs.append({"mode": "full", "clean": len(full[0]), "quarantine": len(full[1])})
+            write_marts(target, full[0], full[1], full[2], latest)
+            runs.append({"mode": "full", "clean": len(full[0]), "quarantine": len(full[1]), "attempts": len(full[2])})
         elif watermark >= latest:
             runs.append({"mode": "noop", "watermark": watermark})
         else:
             change = delta(read_new_raw(source, watermark, latest), lambda e, t: raw_by_keys(source, e, t))
             write_delta(target, change, latest)
             runs.append({"mode": "incremental", "new_raw": change["new_raw"], "recomputed_raw": len(change["raw_ids"]),
-                         "events": len(change["events"]), "clean": len(change["clean"]),
+                         "events": len(change["events"]), "clean": len(change["clean"]), "attempts": len(change["attempts"]),
                          "quarantine": len(change["quarantine"])})
     return {"latest_raw_id": latest, "keys_backfilled": keyed, "targets": runs}

@@ -4,6 +4,8 @@
 
 **v0.2.0**은 v0.1.0의 Python + SQLite 기준 규칙을 그대로 두고, **Kubernetes 위에서 FastAPI 수집 API → Kafka(Strimzi) → PostgreSQL(CloudNativePG) → Airflow(KubernetesPodOperator) 재계산**으로 확장했습니다. 배포는 **Helm 차트 + Kustomize 오버레이를 Argo CD(app-of-apps)가 Git에서 동기화**합니다. 로컬 kind 클러스터에서 end-to-end로 확인했습니다. Snowflake 적재는 체험 계정에서 실행해 PostgreSQL과 같은 결과를 확인했고, EKS는 설정까지 준비했습니다. → [Kubernetes 배포 문서](docs/kubernetes.md)
 
+**v0.5.0**은 두 번째 입력 **단계 시도(`stage_attempt`)**를 받아 단계별 통과 깔때기와 **난이도 벽**(여러 이용자가 반복 실패하고 못 넘은 단계)을 계산합니다. 재화 이벤트와 같은 수집·격리·증분 재계산 경로를 탑니다.
+
 **v0.4.0**은 재계산을 **증분**으로 바꿨습니다. 대상마다 워터마크를 두고, 새 RAW와 같은 이벤트·거래 키에 걸린 행만 다시 계산합니다. 결과는 매 묶음 전체 재계산과 대조 검사합니다.
 
 **v0.3.0**은 운영 관점을 더했습니다. **스키마 진화**(생산자 버전 1~3을 함께 받아 정규화, 계약 위반 격리)와 **모니터링**(Prometheus·Grafana, Kafka 컨슈머 지연·로더 정체·재계산 실패 경보, 대시보드를 Git으로 관리)입니다.

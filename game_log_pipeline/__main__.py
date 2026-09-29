@@ -2,7 +2,7 @@ import argparse
 import json
 import urllib.request
 from pathlib import Path
-from .generator import events
+from .generator import attempts, events
 from .pipeline import canonical, connect, ingest, rebuild, report
 
 
@@ -11,7 +11,7 @@ def local(args):
     target.mkdir(parents=True, exist_ok=True)
     source = Path(args.input) if args.command == "replay" else target / "events.jsonl"
     if args.command == "demo":
-        source.write_text("\n".join(canonical(item) for item in events(args.seed)) + "\n", encoding="utf-8")
+        source.write_text("\n".join(canonical(item) for item in events(args.seed) + attempts(args.seed)) + "\n", encoding="utf-8")
     db = connect(target / "pipeline.sqlite")
     try:
         with source.open(encoding="utf-8") as stream:
@@ -27,7 +27,7 @@ def local(args):
 
 def send(args):
     """Post the synthetic fixture to a running ingest API (used by the in-cluster generator Job)."""
-    body = ("\n".join(canonical(item) for item in events(args.seed)) + "\n").encode("utf-8")
+    body = ("\n".join(canonical(item) for item in events(args.seed) + attempts(args.seed)) + "\n").encode("utf-8")
     request = urllib.request.Request(args.url.rstrip("/") + "/v1/events", data=body,
                                      headers={"Content-Type": "application/x-ndjson"}, method="POST")
     with urllib.request.urlopen(request, timeout=30) as response:

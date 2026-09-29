@@ -27,3 +27,37 @@ def events(seed=42):
     result = [normal, quest, deepcopy(quest), excess, repeated1, repeated2, late, invalid, conflict, altered]
     random.Random(seed).shuffle(result)
     return result
+
+
+def attempts(seed=42):
+    """Synthetic stage attempts: five players climb an endless track that gets hard at stage 8.
+
+    Three of them are stuck there (3+ fails, no clear), one breaks through after two fails.
+    Plus a retry (same delivery twice), a conflicting resend and an out-of-range stage.
+    """
+    rows, minute = [], 0
+    def attempt(player, stage, outcome, track="endless"):
+        nonlocal minute
+        minute += 1
+        rows.append(dict(schema_version=1, source="synthetic", event_type="stage_attempt",
+                         event_id="at_%s_%02d" % (player, len(rows)), player_id=player,
+                         session_id="session_" + player, track=track, stage=stage, outcome=outcome,
+                         duration_ms=30_000 + 1_000 * stage,
+                         event_time="2030-01-02T10:%02d:00Z" % (minute % 60)))
+    for player, fails, breaks in (("p_a", 3, False), ("p_b", 4, False), ("p_c", 3, False), ("p_d", 2, True)):
+        for stage in range(1, 8):
+            attempt(player, stage, "clear")
+        for _ in range(fails):
+            attempt(player, 8, "fail")
+        if breaks:
+            attempt(player, 8, "clear")
+    attempt("p_e", 1, "clear", "story")
+    attempt("p_e", 2, "fail", "story")
+    retry = deepcopy(rows[0])
+    conflict = deepcopy(rows[1])
+    conflict["outcome"] = "fail"
+    invalid = deepcopy(rows[2])
+    invalid.update(event_id="at_invalid", stage=0)
+    result = rows + [retry, conflict, invalid]
+    random.Random(seed).shuffle(result)
+    return result

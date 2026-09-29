@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from copy import deepcopy
 from pathlib import Path
-from game_log_pipeline.generator import events
+from game_log_pipeline.generator import attempts, events
 from game_log_pipeline.pipeline import canonical, connect, ingest, rebuild, report, upcast, validate
 
 class PipelineTests(unittest.TestCase):
@@ -22,7 +22,7 @@ class PipelineTests(unittest.TestCase):
         return next(item for item in events() if item["event_id"] == "ev_normal")
     def test_synthetic_baseline(self):
         result = self.load(events())
-        self.assertEqual(result["counts"], dict(raw_events=10, clean_events=6, quarantine=3, transactions=6))
+        self.assertEqual(result["counts"], dict(raw_events=10, clean_events=6, clean_attempts=0, quarantine=3, transactions=6))
         self.assertEqual({(x["rule"],x["player_id"]) for x in result["anomaly_candidates"]},
                          {("duplicate_reward_claim","p_repeat"),("offline_policy_exceeded","p_excess")})
     def test_offline_payout_is_not_automatically_abuse(self):
@@ -95,6 +95,45 @@ class PipelineTests(unittest.TestCase):
     def test_generator_reproducibility(self):
         self.assertEqual(events(42), events(42))
         self.assertEqual(sorted(map(canonical, events(42))), sorted(map(canonical, events(7))))
+
+class StageAttemptTests(unittest.TestCase):
+    """0.5.0 progression input: funnel per stage and the stages where players get stuck."""
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.db = connect(Path(self.tmp.name) / "attempts.sqlite")
+    def tearDown(self):
+        self.db.close()
+        self.tmp.cleanup()
+    def load(self, items):
+        ingest(self.db, [canonical(item) for item in items])
+        rebuild(self.db)
+        return report(self.db)
+    def test_wall_is_found_where_players_are_stuck(self):
+        result = self.load(attempts())
+        self.assertEqual(result["difficulty_walls"], [dict(track="endless", stage=8, stuck_players=3, fails=10)])
+        wall = next(x for x in result["stage_funnel"] if x["track"] == "endless" and x["stage"] == 8)
+        self.assertEqual((wall["players"], wall["players_cleared"], wall["clears"]), (4, 1, 1))
+    def test_retry_conflict_and_bad_stage(self):
+        result = self.load(attempts())
+        # 43 generated attempts plus a retry, a conflicting resend and an out-of-range stage.
+        self.assertEqual(result["counts"]["raw_events"], 46)
+        self.assertEqual(result["counts"]["clean_attempts"], 42)
+        reasons = sorted(row[0] for row in self.db.execute("SELECT reason FROM quarantine"))
+        self.assertEqual(reasons, ["event_id_conflict", "event_id_conflict", "invalid_schema: stage must be an integer in range"])
+    def test_attempts_never_enter_currency_marts(self):
+        result = self.load(events() + attempts())
+        self.assertEqual(result["counts"]["transactions"], 6)
+        self.assertEqual(len(result["anomaly_candidates"]), 2)
+    def test_attempt_contract(self):
+        item = attempts()[0]
+        for changes in ({"track": "pvp"}, {"stage": True}, {"duration_ms": -1}, {"outcome": "win"}, {"extra": 1}):
+            with self.subTest(changes=changes):
+                with self.assertRaises(ValueError):
+                    validate(dict(item, **changes))
+    def test_upgraded_client_attempt_is_a_retry(self):
+        item = attempts()[0]
+        result = self.load([item, dict(item, schema_version=3, client_version="2.0.0")])
+        self.assertEqual((result["counts"]["clean_attempts"], result["counts"]["quarantine"]), (1, 0))
 
 if __name__ == "__main__":
     unittest.main()
