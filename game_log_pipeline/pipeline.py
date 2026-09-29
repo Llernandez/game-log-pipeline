@@ -58,8 +58,10 @@ def bounded_int(value, low, high, name):
 def validate_attempt(item):
     if set(item) != ATTEMPT_FIELDS:
         raise ValueError("fields must match the public allowlist")
-    if item["source"] != "synthetic":
-        raise ValueError("only synthetic events supported")
+    # 0.6.0: stage attempts may also come from the game's on-device diagnostics (device.py adapter).
+    # Currency events stay synthetic-only: client logs carry no server transaction or claim ids.
+    if item["source"] not in ("synthetic", "device_diagnostic"):
+        raise ValueError("unsupported source for stage_attempt")
     for key in ("event_id", "player_id", "session_id"):
         if not isinstance(item[key], str) or not IDENTIFIER.fullmatch(item[key]):
             raise ValueError("invalid identifier: " + key)

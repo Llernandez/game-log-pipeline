@@ -34,23 +34,39 @@ def send(args):
         print(response.read().decode("utf-8"))
 
 
+def adapt_device(args):
+    """Convert an exported game diagnostic file into stage_attempt JSONL for replay or send."""
+    from .device import adapt
+    with open(args.input, encoding="utf-8") as stream:
+        rows, skipped = adapt(stream, args.player)
+    target = Path(args.output)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("".join(canonical(item) + "\n" for item in rows), encoding="utf-8")
+    print(json.dumps({"stage_attempts": len(rows), "skipped": skipped, "output": str(target)}, ensure_ascii=False))
+
+
 def main():
     parser = argparse.ArgumentParser(description="Synthetic idle reward integrity pipeline")
-    parser.add_argument("command", choices=["demo", "replay", "api", "load", "rebuild", "send"])
+    parser.add_argument("command", choices=["demo", "replay", "api", "load", "rebuild", "send", "adapt"])
     parser.add_argument("--output", default="runs/demo")
-    parser.add_argument("--input", help="JSONL input required by replay")
+    parser.add_argument("--input", help="JSONL input required by replay and adapt")
+    parser.add_argument("--player", default="tester_01", help="adapt: pseudonymous id for the exporting device")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--url", default="http://localhost:8080", help="ingest API base URL for send")
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--mode", choices=["incremental", "full"], default="incremental",
                         help="rebuild: recompute only what changed since each target's watermark, or everything")
     args = parser.parse_args()
-    if args.command == "replay" and not args.input:
-        parser.error("replay requires --input")
+    if args.command in ("replay", "adapt") and not args.input:
+        parser.error(args.command + " requires --input")
     if args.command in ("demo", "replay"):
         local(args)
     elif args.command == "send":
         send(args)
+    elif args.command == "adapt":
+        if args.output == "runs/demo":
+            args.output = "runs/device/attempts.jsonl"
+        adapt_device(args)
     elif args.command == "api":
         import uvicorn
         from .services import create_app

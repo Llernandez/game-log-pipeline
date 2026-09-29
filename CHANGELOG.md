@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- 게임 진단 로그 어댑터(`game_log_pipeline/device.py`, CLI `adapt`): 게임이 내보내는 진단 JSONL(스키마 1~3)의 `battle_result`를 `stage_attempt`로 변환. 탑 층은 무한 도전 트랙, 스토리 단계는 1부터, `duration_ms = ticks × 100`. `event_id`를 유지해 겹치는 재내보내기는 재전송으로 처리.
+- 제외 규칙: 개발 보조(`assisted`·`session_assisted`) 기록, 전투 외 기록(서버 거래 ID가 없는 재화 기록 포함), 깨진 JSON·계약 위반을 사유별로 집계.
+- 검증 경계: `device_diagnostic` 출처는 `stage_attempt`에만 허용하고 재화 이벤트로 들어오면 격리.
+- 형식만 같은 합성 샘플 `examples/device_diagnostic_sample.jsonl`, 검사 34개 → 38개.
+- 문서: README 실행 화면(구조도, Argo CD, Airflow, Grafana, Snowflake), [트러블슈팅](docs/troubleshooting.md), [게임 로그 연결](docs/device-logs.md).
+
 ## 0.5.0 — 2026-09-29
 
 - 두 번째 입력 `stage_attempt`: 스토리·무한 도전 트랙의 단계 시도 한 건(트랙, 단계, 성공/실패, 소요 시간). 재화 이벤트와 같은 RAW·Kafka·재계산 경로를 타고, 같은 규칙(허용 필드 목록, event_id 충돌 격리, 스키마 v1~v3 정규화)을 따른다. 재화 거래 집계에는 섞이지 않는다.

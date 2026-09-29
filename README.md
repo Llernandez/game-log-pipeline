@@ -4,13 +4,29 @@
 
 **v0.2.0**은 v0.1.0의 Python + SQLite 기준 규칙을 그대로 두고, **Kubernetes 위에서 FastAPI 수집 API → Kafka(Strimzi) → PostgreSQL(CloudNativePG) → Airflow(KubernetesPodOperator) 재계산**으로 확장했습니다. 배포는 **Helm 차트 + Kustomize 오버레이를 Argo CD(app-of-apps)가 Git에서 동기화**합니다. 로컬 kind 클러스터에서 end-to-end로 확인했습니다. Snowflake 적재는 체험 계정에서 실행해 PostgreSQL과 같은 결과를 확인했고, EKS는 설정까지 준비했습니다. → [Kubernetes 배포 문서](docs/kubernetes.md)
 
+**게임 진단 로그 연결(Unreleased)**: 개발 중인 게임이 내보내는 진단 로그(JSONL)의 전투 기록을 `stage_attempt`로 바꾸는 어댑터입니다. 개발 보조를 쓴 판과 전투 외 기록은 넣지 않고, 기기 출처는 단계 시도에만 허용합니다. → [게임 로그 연결](docs/device-logs.md)
+
 **v0.5.0**은 두 번째 입력 **단계 시도(`stage_attempt`)**를 받아 단계별 통과 깔때기와 **난이도 벽**(여러 이용자가 반복 실패하고 못 넘은 단계)을 계산합니다. 재화 이벤트와 같은 수집·격리·증분 재계산 경로를 탑니다.
 
 **v0.4.0**은 재계산을 **증분**으로 바꿨습니다. 대상마다 워터마크를 두고, 새 RAW와 같은 이벤트·거래 키에 걸린 행만 다시 계산합니다. 결과는 매 묶음 전체 재계산과 대조 검사합니다.
 
 **v0.3.0**은 운영 관점을 더했습니다. **스키마 진화**(생산자 버전 1~3을 함께 받아 정규화, 계약 위반 격리)와 **모니터링**(Prometheus·Grafana, Kafka 컨슈머 지연·로더 정체·재계산 실패 경보, 대시보드를 Git으로 관리)입니다.
 
-게임 소스나 아트, 실제 사용자 로그를 포함하지 않습니다. 모든 이벤트와 경제 수치는 독립적인 합성 데이터입니다.
+게임 소스나 아트, 실제 사용자 로그를 포함하지 않습니다. 모든 이벤트와 경제 수치는 독립적인 합성 데이터이고, 게임 로그 샘플도 형식만 같은 합성 데이터입니다.
+
+## 실행 화면
+
+로컬 kind 클러스터, 합성 데이터 기준입니다.
+
+![구조: 수집 API, Kafka, 적재, Airflow 재계산, PostgreSQL·Snowflake marts. 배포는 Argo CD가 Git에서 동기화](docs/images/architecture.png)
+
+| Argo CD: 앱 9개 Synced / Healthy | Airflow: 재계산 DAG 30분 주기, 실패 0건 |
+|---|---|
+| ![Argo CD](docs/images/argocd-apps.png) | ![Airflow](docs/images/airflow-rebuild.png) |
+
+| Grafana: 처리량, 컨슈머 지연, 재계산 실패 (캡처 시점은 1시간 유휴라 로더 정체 경보가 켜진 상태) | Snowflake: 이상 후보, PostgreSQL과 같은 결과 |
+|---|---|
+| ![Grafana](docs/images/grafana.png) | ![Snowflake](docs/images/snowflake-anomaly-candidates.png) |
 
 ## 문제
 
@@ -32,6 +48,13 @@ Python 3.11+만 필요합니다. 외부 Python 패키지와 클라우드 자격�
 python -m unittest discover -s tests -v
 python -m game_log_pipeline demo --output runs/demo
 python -m game_log_pipeline replay --input runs/demo/events.jsonl --output runs/demo
+```
+
+게임 진단 로그 형식의 샘플은 어댑터를 거쳐 같은 경로로 넣습니다.
+
+```sh
+python -m game_log_pipeline adapt --input examples/device_diagnostic_sample.jsonl --player tester_01
+python -m game_log_pipeline replay --input runs/device/attempts.jsonl --output runs/device
 ```
 
 `runs/demo/report.json`과 `pipeline.sqlite`를 확인합니다. 마지막 명령은 동일 원문을 다시 수신하는 시험입니다. RAW 건수는 증가하지만 업무 집계·이상 후보는 변하지 않아야 합니다.
@@ -72,9 +95,9 @@ flowchart LR
 
 ## 검증과 한계
 
-- 로컬 Python 3.11에서 단위/통합 검사 29개와 CLI 실행으로 확인합니다. 실제 실행 증거는 [검증 기록](docs/verification.md), 클러스터 실행 결과는 [Kubernetes 배포 문서](docs/kubernetes.md).
+- 로컬 Python 3.11에서 단위/통합 검사 38개와 CLI 실행으로 확인합니다. 실제 실행 증거는 [검증 기록](docs/verification.md), 클러스터 실행 결과는 [Kubernetes 배포 문서](docs/kubernetes.md).
 - `schema.sql`은 SQLite 기준 구현용입니다. 웨어하우스용 `marts.sql`은 PostgreSQL과 Snowflake가 함께 받는 SQL이며, 두 곳 모두에서 실행해 같은 결과를 확인했습니다.
-- 공개 fixture는 합성 source만 받습니다. 실제 개인정보를 넣지 마세요. RAW에는 입력 원문이 남습니다.
+- 재화 이벤트는 합성 source만 받습니다. 단계 시도는 게임 진단 로그 어댑터의 출력(`device_diagnostic`)도 받습니다. 실제 개인정보와 실제 기기 로그를 저장소에 넣지 마세요. RAW에는 입력 원문이 남습니다.
 - 재화 획득 사건만 다루며 소비·환불·전체 원장 대사는 후속 범위입니다.
 - 기간·정책·플레이어 속성은 합성 데이터의 전제입니다. 실제 서비스는 신뢰할 수 있는 서버 원장과 대조해야 합니다.
 - CI 정의는 포함되며 실행 상태는 GitHub Actions에서 확인합니다.
@@ -84,9 +107,11 @@ flowchart LR
 완료(v0.2.0): Kafka producer/consumer, Airflow 스케줄 재계산, kind + Helm + Kustomize + Argo CD.
 완료(v0.3.0): 스키마 진화(upcasting), Prometheus·Grafana 모니터링과 경보, Snowflake 적재 실행 확인(PostgreSQL marts와 같은 결과, [절차·결과](docs/snowflake.md)).
 완료(v0.4.0): 증분 재계산(대상별 워터마크, 키 기준 영향 범위, 전체 재계산과 결과 대조 검사).
+완료(v0.5.0): 단계 시도 입력, 단계별 통과 깔때기와 난이도 벽.
+진행(Unreleased): 게임 진단 로그 어댑터. 출시 후 비공개 수집 API와 보관 정책은 별도로 정합니다.
 
 3. 수집 API 인증·요청 제한, 조회 API
 4. EKS 실제 배포(ALB, ESO, IRSA)와 부하 시험
 5. 필요 시 근거 요약 LLM API
 
-[설계 결정](docs/decisions.md) · [변경 이력](CHANGELOG.md)
+[설계 결정](docs/decisions.md) · [트러블슈팅](docs/troubleshooting.md) · [게임 로그 연결](docs/device-logs.md) · [변경 이력](CHANGELOG.md)
