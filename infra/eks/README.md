@@ -1,6 +1,6 @@
 # EKS 설정 (생성하지 않음)
 
-같은 Helm 차트와 Kustomize 오버레이를 EKS에 올릴 때의 차이만 정리했습니다. 비용 때문에 이 포트폴리오에서는 클러스터를 만들지 않았고, `values-eks.yaml`과 `overlays/eks`는 로컬 클러스터에서 서버 dry-run으로 검증했습니다.
+같은 Helm 차트와 Kustomize 오버레이를 EKS에 올릴 때의 차이만 정리했습니다. 비용 때문에 이 포트폴리오에서는 클러스터를 만들지 않았습니다. `values-eks.yaml`과 `overlays/eks`는 로컬 클러스터에서 서버 dry-run으로 검증했습니다.
 
 | 영역 | 로컬(kind) | EKS |
 |---|---|---|
@@ -14,4 +14,4 @@
 | 비밀 값 | 운영자가 생성한 Secret 참조, Airflow 메타데이터는 bootstrap이 파생 | External Secrets Operator + AWS Secrets Manager, Pod 권한은 IRSA/Pod Identity |
 | Snowflake | 선택 | `glp-snowflake` Secret을 ESO로 동기화 |
 
-Argo CD 애플리케이션은 `path: .../overlays/eks`, `valueFiles: [values-eks.yaml]`로 바꾼 별도 app 세트를 두는 방식을 권장합니다(환경별 폴더).
+Argo CD 애플리케이션은 별도 app 세트를 두는 방식(환경별 폴더)을 권장합니다. 이 세트에서는 `path: .../overlays/eks`, `valueFiles: [values-eks.yaml]`로 바꿉니다.

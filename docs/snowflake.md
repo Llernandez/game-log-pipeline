@@ -1,6 +1,6 @@
 # Snowflake 적재 실행 (무료 체험 계정)
 
-재계산 작업은 PostgreSQL marts를 항상 만들고, Secret `glp-snowflake`가 있으면 같은 SQL로 Snowflake marts도 만든다. 체험 계정만 있으면 비용 없이 확인할 수 있다(체험 크레딧 사용, 아래 설정은 월 1크레딧에서 창고를 멈춘다).
+재계산 작업은 PostgreSQL marts를 항상 만들고 Secret `glp-snowflake`가 있으면 같은 SQL로 Snowflake marts도 만든다. 체험 계정만 있으면 비용 없이 확인할 수 있다(체험 크레딧 사용, 아래 설정은 월 1크레딧에서 창고를 멈춘다).
 
 ## 1. 계정 (직접)
 
@@ -36,13 +36,13 @@ SELECT COUNT(*) FROM GLP.MARTS.CLEAN_EVENTS;   -- 합성 fixture 기준 6
 SELECT * FROM GLP.MARTS.ANOMALY_CANDIDATES;     -- offline_policy_exceeded, duplicate_reward_claim
 ```
 
-PostgreSQL marts와 같은 값이면 두 대상이 같은 SQL을 받는다는 것이 확인된다. 결과 화면을 캡처해 두면 면접 자료로 쓸 수 있다.
+PostgreSQL marts와 값이 같으면 두 대상이 같은 SQL을 받는다고 확인할 수 있다. 결과 화면을 캡처해 두면 면접 자료로 쓸 수 있다.
 
 ## 실행 결과 (2026-09-29, 체험 계정, AWS)
 
 - 키 페어로 `GLP_SERVICE` 접속: 역할 `GLP_LOADER`, 창고 `GLP_WH`, `GLP.MARTS` 확인.
 - Secret 생성 후 Airflow `glp_rebuild` 수동 실행 → `rebuild_marts` success.
-- 같은 RAW(kind 클러스터에 누적된 데모 전송 3회분)에서 두 대상의 결과가 같다.
+- 같은 RAW(kind 클러스터에 누적된 데모 전송 3회분)에서 두 대상의 결과가 일치한다.
 
 | 항목 | PostgreSQL | Snowflake |
 |---|---:|---:|
@@ -52,4 +52,3 @@ PostgreSQL marts와 같은 값이면 두 대상이 같은 SQL을 받는다는 �
 | offline_policy_exceeded:p_excess | 1 | 1 |
 
 격리 9건은 같은 fixture를 세 번 보낸 결과(회당 3건)다. 업무 집계와 이상 후보는 재전송에도 변하지 않는다.
-

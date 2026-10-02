@@ -33,7 +33,7 @@ python -m game_log_pipeline replay --input runs/device/attempts.jsonl --output r
 | 전투 외 기록 (저장, 오프라인 정산, 등용 등) | 클라이언트 로그에는 서버 거래 ID와 보상 권리 ID가 없어 중복 지급 규칙에 쓰면 안 됨 |
 | 깨진 JSON, 계약 위반 | 사유별로 개수만 보고 |
 
-검증 단계도 같은 경계를 지킵니다. `device_diagnostic` 출처는 `stage_attempt`에만 허용되고, 재화 이벤트로 들어오면 격리됩니다.
+검증 단계도 같은 경계를 지킵니다. `device_diagnostic` 출처는 `stage_attempt`에만 허용되고 재화 이벤트로 들어오면 격리됩니다.
 
 ## 한계
 

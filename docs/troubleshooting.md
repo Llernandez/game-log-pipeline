@@ -1,6 +1,6 @@
 # 트러블슈팅 기록
 
-로컬 kind 클러스터에서 GitOps 배포를 구성하며 만난 문제와 해결입니다. 설정 변경은 모두 Git에 반영해, 클러스터를 지우고 다시 만들어도 재발하지 않게 했습니다.
+로컬 kind 클러스터에서 GitOps 배포를 구성하며 만난 문제와 해결입니다. 설정 변경은 모두 Git에 반영해 클러스터를 지우고 다시 만들어도 재발하지 않게 했습니다.
 
 ## 파드에서만 GitHub에 접속되지 않는 문제
 
@@ -24,4 +24,4 @@
 | Airflow 앱이 계속 OutOfSync | 차트의 완료 Job을 TTL이 지우면서 Git과 달라짐 | 사용자 생성·마이그레이션 Job을 Argo CD Sync 훅으로 실행 |
 | VPN 사용 시 통신 불안정 | WSL MTU 1280, kind 네트워크 1500 | kind 네트워크를 호스트 MTU로 생성 |
 | ACCOUNTADMIN으로 Snowflake marts 조회 불가 | marts는 서비스 역할 `GLP_LOADER` 소유인데 상위 역할에 연결되지 않음 | `GRANT ROLE GLP_LOADER TO ROLE SYSADMIN` (Snowflake 권장 역할 계층) |
-| loader가 PostgreSQL보다 먼저 떠서 재시작 | 시작 순서 | 재시작 정책에 맡기고, DB 준비 후 자동 복구됨을 확인 |
+| loader가 PostgreSQL보다 먼저 떠서 재시작 | 시작 순서 | 재시작 정책에 맡기고 DB 준비 후 자동 복구됨을 확인 |
