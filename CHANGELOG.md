@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 문서 정리(2026-10-05): README를 문제·구현 범위·실행·검증 순서로 재구성. 현재 데모 입력 56건과 재전송 기대값, 선택 검사 건너뜀, Grafana 표시 의미, Snowflake 최초 실행 이력을 정리했다. 보고서 출처 고정값·로더 병렬 설정·단계 집계의 한계를 미해결 사항으로 명시했다. 코드·배포 설정 변경은 없다.
 - 게임 진단 로그 어댑터(`game_log_pipeline/device.py`, CLI `adapt`): 게임이 내보내는 진단 JSONL(스키마 1~3)의 `battle_result`를 `stage_attempt`로 변환. 탑 층은 무한 도전 트랙, 스토리 단계는 1부터, `duration_ms = ticks × 100`. `event_id`를 유지하므로 겹쳐서 다시 내보낸 기록은 재전송으로 처리.
 - 제외 규칙: 개발 보조(`assisted`·`session_assisted`) 기록, 전투 외 기록(서버 거래 ID가 없는 재화 기록 포함), 깨진 JSON·계약 위반을 사유별로 집계.
 - 검증 경계: `device_diagnostic` 출처는 `stage_attempt`에만 허용하고 재화 이벤트로 들어오면 격리.

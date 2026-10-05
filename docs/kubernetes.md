@@ -1,4 +1,4 @@
-# Kubernetes 배포 (v0.2.0)
+# Kubernetes 배포와 실행 기록
 
 v0.1.0의 검증·중복 제거 규칙(`game_log_pipeline/pipeline.py`)은 그대로 두고 앞뒤를 쿠버네티스 서비스로 감쌌습니다. 로컬 kind 클러스터에서 end-to-end로 실행해 확인했습니다. EKS는 같은 차트·오버레이의 설정만 준비했습니다(생성하지 않음).
 
@@ -27,7 +27,7 @@ flowchart LR
 |---|---|---|
 | 클러스터 | kind(로컬, WSL2) / EKS 설정만 | Kubernetes 1.37 |
 | 배포 | Argo CD app-of-apps, sync wave(-2 운영자 → -1 플랫폼 → 0 앱 → 1 Airflow) | Argo CD 3.5.3 (chart 10.9.2) |
-| 앱 | Helm 차트 `deploy/charts/game-log-pipeline` (values-local / values-eks) | 0.2.0 |
+| 앱 | Helm 차트 `deploy/charts/game-log-pipeline` (values-local / values-eks) | 0.5.0 |
 | 플랫폼 CR | Kustomize base + overlays(local / eks) | - |
 | Kafka | Strimzi 운영자, KRaft, v1 API | Strimzi 1.2.0, Kafka 4.2.0 |
 | PostgreSQL | CloudNativePG 운영자 | 1.30.1 (chart 0.29.1) |
@@ -40,7 +40,7 @@ flowchart LR
 | 클라이언트 → API | 요청 전체가 acks=all로 확인되면 202, 아니면 503 → 클라이언트가 묶음 전체 재전송 | 재전송으로 생긴 중복은 아래 event_id 규칙이 흡수 |
 | API → Kafka | idempotent producer | 브로커가 producer 재시도 중복 제거 |
 | Kafka → PostgreSQL | at-least-once(DB 커밋 후 오프셋 커밋) | `(topic, partition, offset)` 고유 키로 재전달 무시 |
-| RAW → marts | 전체 재계산(작은 데이터 기준) | v0.1.0의 event_id / transaction_id / reward_claim_id 규칙 그대로 |
+| RAW → marts | 기본 증분, 첫 실행·명시적 요청 시 전체 재계산 | event_id / transaction_id / reward_claim_id 규칙 적용 |
 
 API는 이벤트를 검증하지 않고 원문을 보존합니다. 스키마 오류와 ID 충돌은 재계산에서 격리됩니다(v0.1.0 설계 유지). 요청 크기만 제한합니다(1MiB, 1,000줄, 줄당 16KiB).
 
@@ -93,7 +93,7 @@ bash infra/local/bootstrap.sh
 
 ## 스키마 진화 (0.3.0)
 
-생산자(게임 클라이언트)는 한꺼번에 업그레이드되지 않으므로 여러 스키마 버전이 동시에 들어옵니다. 재계산은 각 버전을 v1 업무 형태로 정규화한 뒤 같은 규칙을 적용합니다. 지원하지 않는 버전과 계약 위반은 사유를 남겨 격리합니다. 같은 이벤트가 다른 버전으로 재전송되면 충돌로 보지 않습니다. 버전 분포는 보고서의 `schema_versions`로 확인합니다.
+생산자(게임 클라이언트)는 한꺼번에 업그레이드되지 않으므로 여러 스키마 버전이 동시에 들어옵니다. 재계산은 각 버전을 공통 이벤트 형식으로 변환한 뒤 같은 규칙을 적용합니다. 지원하지 않는 버전과 계약 위반은 사유를 남겨 격리합니다. 같은 이벤트를 다른 버전으로 재전송해도 정규화된 내용이 같으면 중복으로 처리합니다. 내용이 다르면 격리합니다. 버전 분포는 보고서의 `schema_versions`로 확인합니다.
 
 ## 증분 재계산 (0.4.0)
 
@@ -119,16 +119,16 @@ bash infra/local/bootstrap.sh
 게임이 커지면 재화 외에 진행 로그가 필요합니다. `stage_attempt`는 같은 토픽·RAW 테이블로 들어오고 재계산에서 이벤트 유형별로 나뉩니다.
 
 - 계약: `track`(story/endless), `stage`(1~10000), `outcome`(clear/fail), `duration_ms`. 허용 필드 밖의 값, 범위 밖 단계, 같은 event_id의 다른 내용은 격리합니다.
-- `stage_funnel`: 트랙·단계별 도전 이용자, 통과 이용자, 시도, 통과.
-- `difficulty_walls`: 3번 이상 실패했고 아직 통과하지 못한 이용자가 2명 이상인 단계. 합성 데이터에서는 무한 도전 8단계(막힌 3명, 실패 10회).
+- `stage_funnel`: 관측 기록의 트랙·단계별 도전 이용자, 통과 이용자, 시도·통과 수. 단계 간 이동 순서를 추적하는 퍼널은 아닙니다.
+- `difficulty_walls`: 관측 기록에서 실패가 3회 이상이고 통과 기록이 없는 이용자가 2명 이상인 단계. 합성 데이터에서는 무한 도전 8단계(해당 이용자 3명, 실패 10회)입니다. 부분 로그에서 과거 통과 기록이 빠질 수 있으며 출처·게임 버전·관측 기간은 아직 나누지 않습니다.
 - 증분: 시도는 거래 키가 없어 event_id 폐포만으로 닫힙니다.
 
 확인(2026-09-29, kind + Snowflake 체험 계정): Argo CD가 0.5.0으로 동기화한 뒤 데모 트래픽 Job이 재화 fixture와 시도 46건을 보냈고 로더가 56행을 적재했습니다. Airflow `glp_rebuild`(증분)로 두 대상 모두 워터마크 107, `clean_attempts` 42, `difficulty_walls` = 무한 도전 8단계(막힌 3명, 실패 10회), `stage_funnel` 8단계 도전 4명·통과 1명·시도 13회로 같았습니다. 기존 테이블에 새 테이블·뷰를 더하는 변경이라 전체 재계산 없이 증분으로 반영됐습니다.
 
 ## 한계
 
-- 증분 워터마크는 단일 로더의 커밋 순서에 기댑니다. 병렬 적재에는 커밋 순서 로그나 안전 지연이 필요합니다.
+- 증분 워터마크는 단일 로더의 커밋 순서를 전제로 합니다. 현재 EKS values의 로더 3개 설정과 충돌하므로 실제 배포 전에 수정해야 합니다. 작은 RAW ID의 커밋이 늦어지면 처리 위치가 그 행을 지나칠 수 있습니다. 단일 로더를 유지하려면 배포 중 중첩 실행도 막아야 하며, 병렬 처리는 별도 설계와 검증이 필요합니다.
 - 로컬은 브로커·DB 모두 단일 인스턴스입니다. 복제·장애 조치는 eks 오버레이에서 설정만 했습니다.
-- 2026-09-28 첫 실행은 Snowflake 자격 증명 없이 PostgreSQL marts만 확인했습니다. Snowflake는 0.4.0부터 체험 계정에서 같은 결과를 확인했습니다.
+- 2026-09-28 첫 실행은 PostgreSQL marts만 확인했습니다. Snowflake 최초 실행은 2026-09-29의 0.3.0 기록에 있으며, 0.4.0·0.5.0에서 증분 처리와 전투 시도 결과를 추가로 대조했습니다.
 - 인증·TLS가 없는 로컬 데모입니다. 실제 수집 API는 인증과 요청 제한이 필요합니다.
 - ingress-nginx가 2026년 3월 지원 종료되어 로컬에서는 NodePort를 씁니다. EKS에서는 AWS Load Balancer Controller를 가정합니다.
